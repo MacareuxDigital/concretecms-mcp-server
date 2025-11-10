@@ -189,6 +189,9 @@ async function performOAuthFlow(): Promise<void> {
 
     return new Promise<void>((resolve, reject) => {
         const PORT = 3000;
+        const TIMEOUT_MS = 10 * 60 * 1000; // 10分
+        let timeoutId: NodeJS.Timeout;
+
         const httpServer = createServer(async (req, res) => {
             const url = new URL(req.url!, `http://localhost:${PORT}`);
 
@@ -252,6 +255,8 @@ async function performOAuthFlow(): Promise<void> {
                         </html>
                     `);
 
+                    // タイムアウトをクリア
+                    clearTimeout(timeoutId);
                     httpServer.close();
                     resolve();
                 } catch (error) {
@@ -271,6 +276,8 @@ async function performOAuthFlow(): Promise<void> {
                         </html>
                     `);
 
+                    // タイムアウトをクリア
+                    clearTimeout(timeoutId);
                     httpServer.close();
                     reject(error);
                 }
@@ -280,9 +287,30 @@ async function performOAuthFlow(): Promise<void> {
             }
         });
 
+        // エラーハンドリング
+        httpServer.on('error', (error: NodeJS.ErrnoException) => {
+            if (error.code === 'EADDRINUSE') {
+                console.error(`[concretecms-mcp] Port ${PORT} is already in use.`);
+                console.error(`[concretecms-mcp] Please close the application using this port or run:`);
+                console.error(`[concretecms-mcp]   lsof -ti:${PORT} | xargs kill -9`);
+                reject(new Error(`Port ${PORT} is already in use. Please free the port and try again.`));
+            } else {
+                console.error('[concretecms-mcp] Server error:', error);
+                reject(error);
+            }
+        });
+
         httpServer.listen(PORT, () => {
             console.error(`[concretecms-mcp] Local server started on http://localhost:${PORT}`);
+            console.error(`[concretecms-mcp] Server will automatically stop after 10 minutes if not used`);
             console.error(`[concretecms-mcp] Opening browser...`);
+
+            // 10分後にタイムアウト
+            timeoutId = setTimeout(() => {
+                console.error('[concretecms-mcp] OAuth server timed out after 10 minutes');
+                httpServer.close();
+                reject(new Error('OAuth authentication timed out. Please try again.'));
+            }, TIMEOUT_MS);
 
             const platform = process.platform;
             let command: string;
