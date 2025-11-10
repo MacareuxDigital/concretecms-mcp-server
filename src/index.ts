@@ -8,7 +8,6 @@ import { createServer } from 'http'
 import { exec } from 'child_process'
 import { AxiosError } from 'axios'
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs'
-import { homedir } from 'os'
 
 const canonical_url = process.env.CONCRETE_CANONICAL_URL;
 const client_id = process.env.CONCRETE_API_CLIENT_ID;
@@ -19,9 +18,13 @@ if (!canonical_url || !client_id || !client_secret || !scope) {
     throw new Error("Missing environment variables");
 }
 
-// トークンストレージのパス
-const TOKEN_DIR = join(homedir(), '.concretecms-mcp');
-const TOKEN_FILE = join(TOKEN_DIR, 'tokens.json');
+// プロジェクトルートのパスを取得
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+const PROJECT_ROOT = join(__dirname, '..');
+
+// トークンストレージのパス（プロジェクトルートに保存）
+const TOKEN_FILE = join(PROJECT_ROOT, '.tokens.json');
 
 interface StoredTokens {
     access_token: string;
@@ -46,9 +49,6 @@ function loadTokens(): StoredTokens | null {
 // トークンをファイルに保存する
 function saveTokens(tokens: StoredTokens): void {
     try {
-        if (!existsSync(TOKEN_DIR)) {
-            mkdirSync(TOKEN_DIR, { recursive: true, mode: 0o700 });
-        }
         writeFileSync(TOKEN_FILE, JSON.stringify(tokens, null, 2), { mode: 0o600 });
         console.error('[concretecms-mcp] Tokens saved successfully');
     } catch (error) {
