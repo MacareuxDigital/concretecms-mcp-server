@@ -15,6 +15,7 @@ export async function startMcpServer(authProvider: AuthProvider): Promise<void> 
     specInputMethod: 'file' as const,
     transportType: 'stdio' as const,
     toolMode: 'all' as const,
+    disableAbbreviation: true,
     authProvider,
   }
 
