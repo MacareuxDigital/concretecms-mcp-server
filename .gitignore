@@ -1,5 +1,4 @@
 .idea
+.tokens.json
 /dist
 /node_modules
-/openapi.yml
-.tokens.json

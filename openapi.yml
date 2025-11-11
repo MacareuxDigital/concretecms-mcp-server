@@ -1,0 +1,1943 @@
+openapi: 3.0.0
+info:
+  title: 'Concrete CMS API'
+  version: '1.0'
+paths:
+  /ccm/api/1.0/account:
+    get:
+      tags:
+        - account
+      operationId: getAccount
+      responses:
+        '200':
+          description: 'The currently logged in User'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+      security:
+        -
+          authorization:
+            - 'account:read'
+  '/ccm/api/1.0/pages/{pageID}/{areaHandle}':
+    post:
+      tags:
+        - areas
+      summary: 'Adds a block to a page area.'
+      operationId: addBlockToPageArea
+      parameters:
+        -
+          name: pageID
+          in: path
+          description: 'ID of page'
+          required: true
+          schema:
+            type: integer
+            format: int64
+        -
+          name: areaHandle
+          in: path
+          description: 'Area Name'
+          required: true
+          schema:
+            type: string
+      requestBody:
+        $ref: '#/components/requestBodies/NewBlock'
+      responses:
+        '200':
+          description: 'Successful operation'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Block'
+      security:
+        -
+          authorization:
+            - 'pages:areas:add_blocks'
+  '/ccm/api/1.0/pages/{pageID}/{areaHandle}/{blockID}':
+    put:
+      tags:
+        - areas
+      summary: 'Updates a block within a page area.'
+      operationId: updateBlockInPageArea
+      parameters:
+        -
+          name: pageID
+          in: path
+          description: 'ID of page'
+          required: true
+          schema:
+            type: integer
+            format: int64
+        -
+          name: areaHandle
+          in: path
+          description: 'Area Name'
+          required: true
+          schema:
+            type: string
+        -
+          name: blockID
+          in: path
+          description: 'ID of block'
+          required: true
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        $ref: '#/components/requestBodies/UpdatedBlock'
+      responses:
+        '200':
+          description: 'Successful operation'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeletedAreaBlockResponse'
+      security:
+        -
+          authorization:
+            - 'pages:areas:update_blocks'
+    delete:
+      tags:
+        - areas
+      summary: 'Deletes a block from a page area.'
+      operationId: deleteBlockFromPageArea
+      parameters:
+        -
+          name: pageID
+          in: path
+          description: 'ID of page'
+          required: true
+          schema:
+            type: integer
+            format: int64
+        -
+          name: areaHandle
+          in: path
+          description: 'Area Name'
+          required: true
+          schema:
+            type: string
+        -
+          name: blockID
+          in: path
+          description: 'ID of block'
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: 'Successful operation'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeletedAreaBlockResponse'
+      security:
+        -
+          authorization:
+            - 'pages:areas:delete_blocks'
+  '/ccm/api/1.0/blocks/{blockID}':
+    get:
+      tags:
+        - blocks
+      summary: 'Find a block by its ID'
+      operationId: getBlockById
+      parameters:
+        -
+          name: blockID
+          in: path
+          description: 'ID of block to return'
+          required: true
+          schema:
+            type: integer
+            format: int64
+        -
+          name: includes
+          in: query
+          explode: false
+          schema:
+            type: array
+            items:
+              type: string
+              enum:
+                - pages
+      responses:
+        '200':
+          description: 'Successful operation'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Block'
+        '401':
+          description: 'You do not have the proper permissions to access this resource.'
+        '404':
+          description: 'File not found'
+      security:
+        -
+          authorization:
+            - 'blocks:read'
+    delete:
+      tags:
+        - blocks
+      summary: 'Delete a block by its ID'
+      operationId: deleteBlockById
+      parameters:
+        -
+          name: blockID
+          in: path
+          description: 'ID of block to delete'
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: 'Successful operation'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeletedResponse'
+        '401':
+          description: 'You do not have the proper permissions to delete this resource.'
+        '404':
+          description: 'Block not found'
+      security:
+        -
+          authorization:
+            - 'blocks:delete'
+  '/ccm/api/1.0/files/{fileID}':
+    get:
+      tags:
+        - files
+      summary: 'Find a file by its ID'
+      operationId: getFileById
+      parameters:
+        -
+          name: fileID
+          in: path
+          description: 'ID of file to return'
+          required: true
+        -
+          name: includes
+          in: query
+          explode: false
+          schema:
+            type: array
+            items:
+              type: string
+              enum:
+                - custom_attributes
+      responses:
+        '200':
+          description: 'Successful operation'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/File'
+        '401':
+          description: 'You do not have the proper permissions to access this resource.'
+        '404':
+          description: 'File not found'
+      security:
+        -
+          authorization:
+            - 'files:read'
+    put:
+      tags:
+        - files
+      summary: 'Update a file by its ID'
+      operationId: updateFileById
+      parameters:
+        -
+          name: fileID
+          in: path
+          description: 'ID of file to update'
+          required: true
+      requestBody:
+        $ref: '#/components/requestBodies/UpdatedFile'
+      responses:
+        '200':
+          description: 'Successful operation'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/File'
+        '401':
+          description: 'You do not have the proper permissions to update this resource.'
+        '404':
+          description: 'File not found'
+      security:
+        -
+          authorization:
+            - 'files:update'
+    delete:
+      tags:
+        - files
+      summary: 'Delete a file by its ID'
+      operationId: deleteFileById
+      parameters:
+        -
+          name: fileID
+          in: path
+          description: 'ID of file to delete'
+          required: true
+      responses:
+        '200':
+          description: 'Successful operation'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeletedResponse'
+        '401':
+          description: 'You do not have the proper permissions to delete this resource.'
+        '404':
+          description: 'File not found'
+      security:
+        -
+          authorization:
+            - 'files:delete'
+  /ccm/api/1.0/files:
+    get:
+      tags:
+        - files
+      summary: 'Returns a list of file objects, sorted by last updated descending. The most recent file objects appear first.'
+      operationId: getFiles
+      parameters:
+        -
+          name: limit
+          in: query
+          description: 'The number of objects to return. Must be 100 or less. Defaults to 10.'
+          schema:
+            type: integer
+            format: int64
+        -
+          name: after
+          in: query
+          description: 'The ID of the current object to start at.'
+        -
+          name: includes
+          in: query
+          explode: false
+          schema:
+            type: array
+            items:
+              type: string
+              enum:
+                - custom_attributes
+      responses:
+        '200':
+          description: 'Successful operation'
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/File'
+      security:
+        -
+          authorization:
+            - 'files:read'
+    post:
+      tags:
+        - files
+      summary: 'Adds a file object.'
+      operationId: addFile
+      requestBody:
+        $ref: '#/components/requestBodies/NewFile'
+      responses:
+        '200':
+          description: 'Successful files operation'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/File'
+      security:
+        -
+          authorization:
+            - 'files:add'
+  '/ccm/api/1.0/files/{fileID}/move':
+    post:
+      tags:
+        - files
+      summary: 'Move a file to a new location'
+      operationId: moveFileToLocation
+      parameters:
+        -
+          name: fileID
+          in: path
+          description: 'ID of file to update'
+          required: true
+      requestBody:
+        $ref: '#/components/requestBodies/MoveFile'
+      responses:
+        '200':
+          description: 'Successful operation'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/File'
+        '401':
+          description: 'You do not have the proper permissions to update this resource.'
+        '404':
+          description: 'File not found'
+      security:
+        -
+          authorization:
+            - 'files:update'
+  '/ccm/api/1.0/groups/{groupID}':
+    get:
+      tags:
+        - groups
+      summary: 'Find a user group by its ID'
+      operationId: getGroupById
+      parameters:
+        -
+          name: groupID
+          in: path
+          description: 'ID of group'
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: 'Successful groups operation'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Group'
+        '401':
+          description: 'You do not have the proper permissions to access this resource.'
+        '404':
+          description: 'Group not found'
+      security:
+        -
+          authorization:
+            - 'groups:read'
+  /ccm/api/1.0/groups:
+    get:
+      tags:
+        - groups
+      summary: 'Returns a list of Group objects, sorted by ID ascending.'
+      operationId: getGroups
+      parameters:
+        -
+          name: limit
+          in: query
+          description: 'The number of objects to return. Must be 100 or less. Defaults to 10.'
+          schema:
+            type: integer
+            format: int64
+        -
+          name: after
+          in: query
+          description: 'The ID of the current object to start after.'
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: 'Successful operation'
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Group'
+      security:
+        -
+          authorization:
+            - 'groups:read'
+    post:
+      tags:
+        - groups
+      summary: 'Adds a Group object.'
+      operationId: addGroup
+      requestBody:
+        $ref: '#/components/requestBodies/NewGroup'
+      responses:
+        '200':
+          description: 'Successful groups operation'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NewGroup'
+      security:
+        -
+          authorization:
+            - 'groups:add'
+  '/ccm/api/1.0/pages/{pageID}':
+    get:
+      tags:
+        - pages
+      summary: 'Find a page by its ID'
+      operationId: getPageById
+      parameters:
+        -
+          name: pageID
+          in: path
+          description: 'ID of Page to return'
+          required: true
+          schema:
+            type: integer
+            format: int64
+        -
+          name: includes
+          in: query
+          explode: false
+          schema:
+            type: array
+            items:
+              type: string
+              enum:
+                - custom_attributes
+                - areas
+                - files
+                - content
+                - areas.content
+        -
+          name: version
+          in: query
+          description: 'Return the active version (default) or the most recent version'
+          schema:
+            type: string
+            enum:
+              - active
+              - recent
+      responses:
+        '200':
+          description: 'Successful Page operation'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Page'
+      security:
+        -
+          authorization:
+            - 'pages:read'
+    put:
+      tags:
+        - pages
+      summary: 'Update a page by its ID'
+      operationId: updatePageById
+      parameters:
+        -
+          name: pageID
+          in: path
+          description: 'ID of page to update'
+          required: true
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        $ref: '#/components/requestBodies/UpdatedPage'
+      responses:
+        '200':
+          description: 'Successful operation'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Page'
+        '401':
+          description: 'You do not have the proper permissions to update this resource.'
+        '404':
+          description: 'Page not found'
+      security:
+        -
+          authorization:
+            - 'pages:update'
+    delete:
+      tags:
+        - pages
+      summary: 'Delete a page by its ID'
+      operationId: deletePageById
+      parameters:
+        -
+          name: pageID
+          in: path
+          description: 'ID of page to delete'
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: 'Successful operation'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeletedResponse'
+        '401':
+          description: 'You do not have the proper permissions to delete this resource.'
+        '404':
+          description: 'Page not found'
+      security:
+        -
+          authorization:
+            - 'pages:delete'
+  /ccm/api/1.0/pages:
+    get:
+      tags:
+        - pages
+      summary: 'Returns a list of page objects, sorted by last updated descending. The most recent Page objects appear first.'
+      operationId: getPages
+      parameters:
+        -
+          name: limit
+          in: query
+          description: 'The number of objects to return. Must be 100 or less. Defaults to 10.'
+          schema:
+            type: integer
+            format: int64
+        -
+          name: after
+          in: query
+          description: 'The ID of the current object to start at.'
+          schema:
+            type: integer
+            format: int64
+        -
+          name: includes
+          in: query
+          explode: false
+          schema:
+            type: array
+            items:
+              type: string
+              enum:
+                - custom_attributes
+                - areas
+                - files
+                - content
+                - areas.content
+      responses:
+        '200':
+          description: 'Successful operation'
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Page'
+      security:
+        -
+          authorization:
+            - 'pages:read'
+    post:
+      tags:
+        - pages
+      summary: 'Adds a page object.'
+      operationId: addPage
+      requestBody:
+        $ref: '#/components/requestBodies/NewPage'
+      responses:
+        '200':
+          description: 'Successful files operation'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Page'
+      security:
+        -
+          authorization:
+            - 'pages:add'
+  '/ccm/api/1.0/pages/{pageID}/children':
+    get:
+      tags:
+        - pages
+      summary: 'Allows the traversal of the sitemap by showing child pages of a particular page.'
+      operationId: getChildPages
+      parameters:
+        -
+          name: pageID
+          in: path
+          description: 'Display children beneath a particular parent.'
+          required: true
+          schema:
+            type: integer
+            format: int64
+        -
+          name: includes
+          in: query
+          explode: false
+          schema:
+            type: array
+            items:
+              type: string
+              enum:
+                - custom_attributes
+                - areas
+                - files
+                - content
+                - areas.content
+      responses:
+        '200':
+          description: 'An array of Page objects.'
+      security:
+        -
+          authorization:
+            - 'pages:read'
+  '/ccm/api/1.0/sites/{siteID}':
+    get:
+      tags:
+        - sites
+      summary: 'Find a site by its ID'
+      operationId: getSiteById
+      parameters:
+        -
+          name: siteID
+          in: path
+          description: 'ID of Site to return'
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: 'Successful operation'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Site'
+      security:
+        -
+          clientCredentials:
+            - 'sites:read'
+  /ccm/api/1.0/sites:
+    get:
+      tags:
+        - sites
+      summary: 'Returns a list of site objects, sorted by date added ascending.'
+      operationId: getSites
+      parameters:
+        -
+          name: includes
+          in: query
+          explode: false
+          schema:
+            type: array
+            items:
+              type: string
+              enum:
+                - locales
+                - custom_attributes
+      responses:
+        '200':
+          description: 'Successful operation'
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Site'
+      security:
+        -
+          clientCredentials:
+            - 'sites:read'
+  /ccm/api/1.0/sites/default:
+    get:
+      tags:
+        - sites
+      summary: 'Retrieve the default site for your Concrete installation'
+      operationId: getDefaultSite
+      parameters:
+        -
+          name: includes
+          in: query
+          explode: false
+          schema:
+            type: array
+            items:
+              type: string
+              enum:
+                - locales
+                - custom_attributes
+      responses:
+        '200':
+          description: 'Successful operation'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Site'
+      security:
+        -
+          clientCredentials:
+            - 'sites:read'
+  /ccm/api/1.0/system/info:
+    get:
+      tags:
+        - system
+      operationId: getSystemInfo
+      responses:
+        '200':
+          description: 'The info object in JSON format'
+      security:
+        -
+          clientCredentials:
+            - 'system:info:read'
+  '/ccm/api/1.0/users/{userID}':
+    get:
+      tags:
+        - users
+      summary: 'Find a user by its ID'
+      operationId: getUserById
+      parameters:
+        -
+          name: userID
+          in: path
+          description: 'ID of user to return'
+          required: true
+          schema:
+            type: integer
+            format: int64
+        -
+          name: includes
+          in: query
+          explode: false
+          schema:
+            type: array
+            items:
+              type: string
+              enum:
+                - custom_attributes
+                - groups
+      responses:
+        '200':
+          description: 'Successful user operation'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+      security:
+        -
+          authorization:
+            - 'users:read'
+    put:
+      tags:
+        - users
+      summary: 'Update a user by its ID'
+      operationId: updateUserById
+      parameters:
+        -
+          name: userID
+          in: path
+          description: 'ID of user to update'
+          required: true
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        $ref: '#/components/requestBodies/UpdatedUser'
+      responses:
+        '200':
+          description: 'Successful operation'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '401':
+          description: 'You do not have the proper permissions to update this resource.'
+        '404':
+          description: 'User not found'
+      security:
+        -
+          authorization:
+            - 'users:update'
+    delete:
+      tags:
+        - users
+      summary: 'Delete a user by its ID'
+      operationId: deleteUserById
+      parameters:
+        -
+          name: userID
+          in: path
+          description: 'ID of user to delete'
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: 'Successful operation'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeletedResponse'
+        '401':
+          description: 'You do not have the proper permissions to delete this resource.'
+        '404':
+          description: 'User not found'
+      security:
+        -
+          authorization:
+            - 'users:delete'
+  /ccm/api/1.0/users:
+    get:
+      tags:
+        - users
+      summary: 'Returns a list of user objects, sorted by date added descending. The most recent user objects appear first.'
+      operationId: getUsers
+      parameters:
+        -
+          name: limit
+          in: query
+          description: 'The number of objects to return. Must be 100 or less. Defaults to 10.'
+          schema:
+            type: integer
+            format: int64
+        -
+          name: after
+          in: query
+          description: 'The ID of the current object to start at.'
+          schema:
+            type: integer
+            format: int64
+        -
+          name: includes
+          in: query
+          explode: false
+          schema:
+            type: array
+            items:
+              type: string
+              enum:
+                - custom_attributes
+                - groups
+      responses:
+        '200':
+          description: 'Successful operation'
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/User'
+      security:
+        -
+          authorization:
+            - 'users:read'
+    post:
+      tags:
+        - users
+      summary: 'Adds a user object.'
+      operationId: addUser
+      requestBody:
+        $ref: '#/components/requestBodies/NewUser'
+      responses:
+        '200':
+          description: 'Successful files operation'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+      security:
+        -
+          authorization:
+            - 'users:add'
+  '/ccm/api/1.0/users/{userID}/change_password':
+    post:
+      tags:
+        - users
+      summary: 'Change a user''s password'
+      operationId: changeUserPassword
+      parameters:
+        -
+          name: userID
+          in: path
+          description: 'ID of user to update'
+          required: true
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        $ref: '#/components/requestBodies/ChangeUserPassword'
+      responses:
+        '200':
+          description: 'Successful operation'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '401':
+          description: 'You do not have the proper permissions to update this resource.'
+        '404':
+          description: 'User not found'
+      security:
+        -
+          authorization:
+            - 'users:update'
+  '/ccm/api/1.0/page_versions/{pageID}/{versionID}':
+    get:
+      tags:
+        - page_versions
+      summary: 'Find a page version by its ID and the ID of its page.'
+      operationId: getPageVersionByPageIdAndVersionId
+      parameters:
+        -
+          name: pageID
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+        -
+          name: versionID
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: 'Successful operation'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PageVersion'
+        '401':
+          description: 'You do not have the proper permissions to access this resource.'
+        '404':
+          description: 'Page version not found'
+      security:
+        -
+          authorization:
+            - 'pages:versions:read'
+    put:
+      tags:
+        - page_versions
+      summary: 'Update a page version'
+      operationId: updatePageVersionByPageIdAndVersionId
+      parameters:
+        -
+          name: pageID
+          in: path
+          description: 'ID of page to update'
+          required: true
+          schema:
+            type: integer
+            format: int64
+        -
+          name: versionID
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        $ref: '#/components/requestBodies/UpdatedPageVersion'
+      responses:
+        '200':
+          description: 'Successful operation'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PageVersion'
+        '401':
+          description: 'You do not have the proper permissions to update this resource.'
+        '404':
+          description: 'Version not found'
+      security:
+        -
+          authorization:
+            - 'pages:versions:update'
+    delete:
+      tags:
+        - page_versions
+      summary: 'Delete a page version.'
+      operationId: deletePageVersionByPageIdAndVersionId
+      parameters:
+        -
+          name: pageID
+          in: path
+          description: 'ID of page'
+          required: true
+          schema:
+            type: integer
+            format: int64
+        -
+          name: versionID
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: 'Successful operation'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeletedResponse'
+        '401':
+          description: 'You do not have the proper permissions to delete this resource.'
+        '404':
+          description: 'Page version found'
+      security:
+        -
+          authorization:
+            - 'pages:versions:delete'
+  '/ccm/api/1.0/page_versions/{pageID}':
+    get:
+      tags:
+        - page_versions
+      summary: 'Returns a list of page version objects for a given page ID, sorted by date created descending.'
+      operationId: getPageVersionsByPageId
+      parameters:
+        -
+          name: pageID
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+        -
+          name: limit
+          in: query
+          description: 'The number of objects to return. Must be 100 or less. Defaults to 10.'
+          schema:
+            type: integer
+            format: int64
+        -
+          name: resultsPage
+          in: query
+          description: 'The page of results to retrieve. Default is 1.'
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: 'Successful operation'
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/PageVersion'
+      security:
+        -
+          authorization:
+            - 'pages:versions:read'
+components:
+  schemas:
+    AddressAttributeValue:
+      title: 'Address Attribute Value'
+      properties:
+        address1:
+          title: 'Address 1'
+          type: string
+        address2:
+          title: 'Address 2'
+          type: string
+        address3:
+          title: 'Address 3'
+          type: string
+        city:
+          title: City
+          type: string
+        state_province:
+          title: 'State/Province Code'
+          type: string
+        country:
+          title: 'Country Code'
+          type: string
+        postal_code:
+          title: 'Postal Code'
+          type: string
+      type: object
+    Area:
+      title: 'Area model'
+      properties:
+        name:
+          title: 'Block Area'
+          type: string
+          format: string
+        blocks:
+          title: Blocks
+          type: array
+          items:
+            $ref: '#/components/schemas/Block'
+        content:
+          $ref: '#/components/schemas/Content'
+      type: object
+    Block:
+      title: 'Block model'
+      properties:
+        id:
+          title: 'Block ID'
+          type: integer
+          format: int64
+        type:
+          title: 'Block Type Handle'
+          type: string
+          format: string
+        value:
+          title: 'Block value'
+          type: object
+      type: object
+    Calendar:
+      title: 'Calendar model'
+      properties:
+        id:
+          title: ID
+          type: integer
+        name:
+          title: 'Block Area'
+          type: string
+          format: string
+        site:
+          $ref: '#/components/schemas/Site'
+      type: object
+    CalendarEvent:
+      title: 'CalendarEvent model'
+      properties:
+        id:
+          title: ID
+          type: integer
+        name:
+          title: 'Block Area'
+          type: string
+          format: string
+        version:
+          $ref: '#/components/schemas/CalendarEventVersion'
+        custom_attributes:
+          title: 'Custom Attributes'
+          type: array
+          items:
+            $ref: '#/components/schemas/CustomAttribute'
+      type: object
+    CalendarEventVersion:
+      title: CalendarEventVersion
+      properties:
+        id:
+          title: ID
+          type: integer
+        is_approved:
+          title: 'Is Approved'
+          type: string
+          format: boolean
+      type: object
+    ChangeUserPassword:
+      title: 'ChangeUserPassword model'
+      properties:
+        password:
+          title: 'New password'
+          type: string
+      type: object
+    Content:
+      title: Content
+      properties:
+        content:
+          title: Content
+          description: 'HTML content. The content has been sanitized, removing style and script tags.'
+          type: string
+        raw:
+          title: 'Content (Raw HTML)'
+          description: 'Unsanitized HTML content. Style and script tags are still present.'
+          type: string
+      type: object
+    CustomAttribute:
+      title: 'Custom Attribute'
+      properties:
+        id:
+          title: 'Attribute Value ID'
+          type: integer
+          format: int64
+        type:
+          title: 'Attribute Type handle'
+          type: string
+          format: string
+        key:
+          title: 'Attribute Key Handle'
+          type: string
+          format: string
+        value:
+          type: string
+          oneOf:
+            -
+              type: string
+            -
+              type: integer
+            -
+              type: boolean
+            -
+              type: object
+      type: object
+    File:
+      title: 'File model'
+      properties:
+        id:
+          title: 'File ID'
+        uuid:
+          title: UUID
+          type: string
+        url:
+          title: 'Direct URL to access File'
+          type: string
+        tracked_url:
+          title: 'Tracking URL'
+          description: 'Forces download in all cases, tracks statistics'
+          type: string
+        file_type:
+          title: 'File Type'
+          type: string
+        extension:
+          title: Extension
+          type: string
+        title:
+          title: Title
+          type: string
+        description:
+          title: Description
+          type: string
+        tags:
+          title: Tags
+          type: string
+        date_added:
+          title: 'Date Added'
+          type: string
+          format: date
+        size:
+          title: 'File Size'
+          type: object
+        folder:
+          title: 'Folder ID'
+          type: integer
+        custom_attributes:
+          title: 'Custom Attributes'
+          type: array
+          items:
+            $ref: '#/components/schemas/CustomAttribute'
+      type: object
+    Group:
+      type: object
+      allOf:
+        -
+          $ref: '#/components/schemas/NewGroup'
+        -
+          properties:
+            id:
+              title: ID
+              type: integer
+          type: object
+    Locale:
+      title: 'Locale model'
+      description: 'A Concrete Site Locale object.'
+      properties:
+        id:
+          title: ID
+          type: integer
+        country:
+          title: 'Site handle'
+          type: string
+        language:
+          title: 'Site Name'
+          type: string
+        home_page_id:
+          title: 'Home Page ID'
+          type: integer
+      type: object
+    MoveFile:
+      title: 'MoveFile model'
+      properties:
+        folder:
+          title: Folder
+          type: integer
+      type: object
+    NewBlock:
+      title: 'NewBlock model'
+      description: 'A Concrete Block'
+      properties:
+        type:
+          title: 'Block Type Handle'
+          type: string
+        value:
+          title: 'Block value'
+          description: 'Key/Value object that maps to the request array that powers the block editing interface.'
+          type: object
+      type: object
+    NewFile:
+      title: 'NewFile model'
+      properties:
+        folder:
+          title: 'Folder ID'
+          type: integer
+        file:
+          title: 'File to upload'
+          type: string
+          format: binary
+      type: object
+    NewGroup:
+      title: 'NewGroup model'
+      description: 'A Concrete User Group'
+      properties:
+        name:
+          title: 'Group Name'
+          type: string
+      type: object
+    NewPage:
+      title: 'NewPage model'
+      description: 'A Concrete User'
+      type: object
+      allOf:
+        -
+          $ref: '#/components/schemas/UpdatedPage'
+        -
+          properties:
+            parent:
+              title: ID
+              type: integer
+          type: object
+    NewUser:
+      title: 'NewUser model'
+      description: 'A Concrete User'
+      properties:
+        username:
+          title: Username
+          type: string
+        email:
+          title: Email
+          type: string
+        password:
+          title: Password
+          type: string
+        language:
+          title: Language
+          type: string
+      type: object
+    OptionListOption:
+      title: 'OptionList Option Value'
+      properties:
+        id:
+          title: ID
+          type: integer
+        value:
+          title: 'Option Value'
+          type: string
+        display_value:
+          title: 'Option Value (Plain Text)'
+          type: string
+      type: object
+    Page:
+      title: 'Page model'
+      description: 'A Concrete Page object.'
+      properties:
+        id:
+          title: ID
+          type: integer
+        path:
+          title: 'Page path'
+          type: string
+        name:
+          title: 'Page Name'
+          type: string
+        type:
+          title: 'Page Type'
+          type: string
+        template:
+          title: 'Page Template'
+          type: string
+        date_added:
+          title: 'Date page created'
+          type: string
+          format: date
+        date_last_updated:
+          title: 'Date page last updated'
+          type: string
+          format: date
+        locale:
+          title: 'Locale of the page'
+          description: 'Locale of the page - defaults to site if unset.'
+          type: string
+          format: date
+        external_link_url:
+          title: 'External Link URL'
+          description: 'If this page node is actually an external link, the value of the link URL.'
+          type: string
+        description:
+          title: 'Short description'
+          type: string
+        custom_attributes:
+          title: 'Custom Attributes'
+          type: array
+          items:
+            $ref: '#/components/schemas/CustomAttribute'
+        areas:
+          title: Areas
+          type: array
+          items:
+            $ref: '#/components/schemas/Area'
+        files:
+          title: 'Custom Attributes'
+          type: array
+          items:
+            $ref: '#/components/schemas/File'
+        content:
+          $ref: '#/components/schemas/Content'
+        version:
+          $ref: '#/components/schemas/PageVersion'
+      type: object
+    PageVersion:
+      title: PageVersion
+      properties:
+        id:
+          title: ID
+          type: integer
+        is_approved:
+          title: 'Is Approved'
+          type: string
+          format: boolean
+        date_created:
+          title: 'Date page created'
+          type: string
+          format: date
+        date_approved:
+          title: 'Date approved'
+          type: string
+          format: date
+        publish_end_date:
+          title: 'Publish end date'
+          type: string
+          format: date
+      type: object
+    Site:
+      title: 'Site model'
+      description: 'A Concrete Site object.'
+      properties:
+        id:
+          title: ID
+          type: integer
+        handle:
+          title: 'Site handle'
+          type: string
+        name:
+          title: 'Site Name'
+          type: string
+        home_page_id:
+          title: 'Home Page ID'
+          type: integer
+        default_locale:
+          title: 'Default Locale'
+          type: string
+        locales:
+          title: Locales
+          type: array
+          items:
+            $ref: '#/components/schemas/Locale'
+      type: object
+    Topic:
+      title: 'Topic model'
+      description: 'A Concrete Topic object.'
+      properties:
+        id:
+          title: ID
+          type: integer
+        path:
+          title: Path
+          type: string
+        name:
+          title: Name
+          type: string
+        display_name:
+          title: 'Display Name'
+          type: string
+      type: object
+    UpdatedBlock:
+      title: 'UpdatedBlock model'
+      description: 'A Concrete Block'
+      properties:
+        value:
+          title: 'Block value'
+          description: 'Key/Value object that maps to the request array that powers the block editing interface.'
+          type: object
+      type: object
+    UpdatedFile:
+      title: 'UpdatedFile model'
+      properties:
+        title:
+          title: Title
+          description: 'Title/name as displayed in the file manager.'
+          type: string
+        description:
+          title: Description
+          type: string
+        tags:
+          title: Tags
+          type: string
+        attributes:
+          title: Attributes
+          properties:
+            width:
+              title: Width
+              type: number
+            height:
+              title: Height
+              type: number
+            duration:
+              title: Duration
+              type: number
+          type: object
+      type: object
+    UpdatedPage:
+      title: 'UpdatedPage model'
+      description: 'A Concrete Page'
+      properties:
+        name:
+          title: ID
+          type: string
+        description:
+          title: 'Short description'
+          type: string
+        type:
+          title: 'Page Type'
+          description: 'The handle of the page type you want to apply to this page.'
+          type: string
+        template:
+          title: 'Page Type'
+          description: 'The handle of the page template you want to apply to this page.'
+          type: string
+        attributes:
+          title: Attributes
+          properties:
+            meta_title:
+              title: 'Meta Title'
+              type: string
+            meta_description:
+              title: 'Meta Description'
+              type: string
+            meta_keywords:
+              title: 'Meta Keywords'
+              type: string
+            exclude_nav:
+              title: 'Exclude From Nav'
+              type: boolean
+            exclude_page_list:
+              title: 'Exclude From Page List'
+              type: boolean
+            header_extra_content:
+              title: 'Header Extra Content'
+              type: string
+            tags:
+              title: Tags
+              type: array
+              items:
+                type: integer
+            is_featured:
+              title: 'Is Featured'
+              type: boolean
+            exclude_search_index:
+              title: 'Exclude From Search Index'
+              type: boolean
+            exclude_sitemapxml:
+              title: 'Exclude From sitemap.xml'
+              type: boolean
+            exclude_subpages_from_nav:
+              title: 'Exclude Sub-Pages From Nav'
+              type: boolean
+            thumbnail:
+              title: Thumbnail
+              type: number
+            job_posting_department:
+              title: Department
+              type: array
+              items:
+                type: integer
+            job_location:
+              title: Location
+              type: string
+            blog_entry_topics:
+              title: 'Blog Entry Topics'
+              type: array
+              items:
+                type: integer
+            project_topics:
+              title: 'Project Topics'
+              type: array
+              items:
+                type: integer
+            project_client:
+              title: Client
+              type: string
+            project_tasks:
+              title: Task
+              type: array
+              items:
+                type: integer
+            project_skills:
+              title: Skills
+              type: array
+              items:
+                type: integer
+          type: object
+      type: object
+    UpdatedPageVersion:
+      title: 'UpdatedPageVersion model'
+      description: 'A Concrete Page Version'
+      properties:
+        is_approved:
+          title: 'Is Version Approved'
+          type: boolean
+        publish_end_date:
+          title: 'Publish end date'
+          type: string
+          format: date
+      type: object
+    UpdatedUser:
+      title: 'UpdatedUser model'
+      description: 'A Concrete User'
+      properties:
+        username:
+          title: Username
+          type: string
+        email:
+          title: Email
+          type: string
+        language:
+          title: Language
+          type: string
+        attributes:
+          title: Attributes
+          properties:
+            profile_private_messages_enabled:
+              title: 'I would like to receive private messages.'
+              type: boolean
+            profile_private_messages_notification_enabled:
+              title: 'Send me email notifications when I receive a private message.'
+              type: boolean
+            account_profile_links:
+              title: 'Personal Links'
+              type: array
+              items:
+                $ref: '#/components/schemas/UserSocialLink'
+          type: object
+      type: object
+    User:
+      title: 'User model'
+      properties:
+        id:
+          title: 'User ID'
+          type: string
+          format: int64
+        username:
+          title: Username
+          type: string
+          format: string
+        email:
+          title: Email
+          type: string
+          format: string
+        date_added:
+          title: 'Date Added'
+          type: string
+          format: date
+        date_password_last_changed:
+          title: 'Date Password Last Changed'
+          type: string
+          format: date
+        date_last_updated:
+          title: 'Date Last Updated'
+          type: string
+          format: date
+        status:
+          title: Status
+          type: string
+          format: string
+        total_logins:
+          title: 'Total Logins'
+          description: 'Total number of times logged in'
+          type: string
+          format: int64
+        has_avatar:
+          title: 'Has Avatar'
+          type: string
+          format: boolean
+        avatar:
+          title: Avatar
+          description: 'Fill URL to the user''s profile picture'
+          type: string
+          format: string
+        last_login:
+          title: 'Last Login Timestamp'
+          type: integer
+          format: int64
+        previous_login:
+          title: 'Previous Login Timestamp'
+          type: integer
+          format: int64
+        timezone:
+          title: Timezone
+          type: string
+          format: string
+        language:
+          title: Language
+          type: string
+          format: string
+        custom_attributes:
+          title: 'Custom Attributes'
+          type: array
+          items:
+            $ref: '#/components/schemas/CustomAttribute'
+      type: object
+    UserSocialLink:
+      title: 'UserSocialLink model'
+      properties:
+        service:
+          title: 'Service handle'
+          type: string
+        service_info:
+          title: 'Service Info'
+          type: string
+      type: object
+    DeletedAreaBlockResponse:
+      title: 'Deletion Successful'
+      type: object
+      allOf:
+        -
+          $ref: '#/components/schemas/DeletedResponse'
+        -
+          properties:
+            version:
+              $ref: '#/components/schemas/PageVersion'
+          type: object
+    DeletedResponse:
+      title: 'Deletion Successful'
+      properties:
+        id:
+          title: ID
+          type: string
+        object:
+          title: 'Object Type'
+          type: string
+        deleted:
+          title: 'Deleted?'
+          type: boolean
+      type: object
+  requestBodies:
+    ChangeUserPassword:
+      description: 'Change a user''s password.'
+      required: true
+      content:
+        multipart/form-data:
+          schema:
+            $ref: '#/components/schemas/ChangeUserPassword'
+    MoveFile:
+      description: 'Move a file to a new folder.'
+      required: true
+      content:
+        multipart/form-data:
+          schema:
+            $ref: '#/components/schemas/MoveFile'
+    NewBlock:
+      description: 'Block object that needs to be added to the CMS'
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/NewBlock'
+    NewFile:
+      description: 'Adding a file to the CMS'
+      required: true
+      content:
+        multipart/form-data:
+          schema:
+            $ref: '#/components/schemas/NewFile'
+    NewGroup:
+      description: 'Group object that needs to be added to the CMS'
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/NewGroup'
+    NewPage:
+      description: 'Page object that needs to be added to the CMS'
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/NewPage'
+    NewUser:
+      description: 'User object that needs to be added to the CMS'
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/NewUser'
+    UpdatedBlock:
+      description: 'Block object updated through the CMS'
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/UpdatedBlock'
+    UpdatedFile:
+      description: 'File object updated through the CMS'
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/UpdatedFile'
+    UpdatedPage:
+      description: 'Page object updated through the CMS'
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/UpdatedPage'
+    UpdatedPageVersion:
+      description: 'Page version object updated through the CMS'
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/UpdatedPageVersion'
+    UpdatedUser:
+      description: 'User object that needs to be updated in the CMS'
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/UpdatedUser'
+  securitySchemes:
+    clientCredentials:
+      type: oauth2
+      flows:
+        clientCredentials:
+          tokenUrl: /oauth/2.0/token
+          scopes:
+            'system:info:read': 'Read system information'
+            'sites:read': 'Read sites'
+    authorization:
+      type: oauth2
+      flows:
+        authorizationCode:
+          authorizationUrl: /oauth/2.0/authorize
+          tokenUrl: /oauth/2.0/token
+          scopes:
+            openid: 'Remotely authenticate into Concrete'
+            'account:read': 'Read your user object'
+            'calendars:read': 'Read calendars'
+            'calendar_events:read': 'Read calendar events'
+            'files:read': 'Read files as your user'
+            'files:add': 'Add files'
+            'files:update': 'Update files'
+            'files:delete': 'Delete files'
+            'pages:read': 'View site pages'
+            'pages:add': 'Add pages'
+            'pages:update': 'Update pages'
+            'pages:delete': 'Delete pages'
+            'pages:areas:add_block': 'Add blocks to a page area'
+            'pages:areas:delete_block': 'Delete blocks from a page area'
+            'pages:areas:update_block': 'Updates a block in a page area'
+            'pages:versions:read': 'View page versions'
+            'pages:versions:update': 'Update page versions'
+            'pages:versions:delete': 'Delete page versions'
+            'blocks:read': 'View site blocks'
+            'blocks:update': 'Update blocks'
+            'blocks:delete': 'Delete blocks'
+            'users:read': 'Views users in the site'
+            'users:add': 'Add users'
+            'users:update': 'Update users'
+            'users:delete': 'Delete users'
+            'groups:read': 'Views groups in the site'
+            'groups:add': 'Add groups'
