@@ -44,7 +44,7 @@ Here's an example configuration for Claude Desktop:
 - Set `CONCRETE_API_CLIENT_ID` and `CONCRETE_API_CLIENT_SECRET` to the credentials of a registered API integration.
 - Set `CONCRETE_API_SCOPE` to the scopes you want to request. You can find a list of available scopes from `https://your-concrete.example/index.php/dashboard/system/api/scopes`.
 
-After you've configured the MCP server, please restart Claude Desktop. It'll automatically opens a authorization window, then sign in and authorize the requested scopes.
+After you've configured the MCP server, please restart Claude Desktop. It'll automatically opens an authorization window, then sign in and authorize the requested scopes.
 Now you should be able to get information about your Concrete CMS in a chat. A refresh token will be saved in `.tokens.json` in the `concretecms-mcp-server` directory, so you don't need to sign in again.
 
 ![Screenshot of a chat with Claude Desktop and a Concrete CMS MCP Server](docs/screenshot.png)
@@ -78,6 +78,7 @@ You can find a list of all available endpoints in [Concrete CMS REST API - Endpo
 ## ToDos
 
 - Test with other MCP clients.
+- Add useful prompts.
 - Support another authentication method than OAuth2.
 - Support to build a remote MCP server (Streamable HTTP Transport).
 
