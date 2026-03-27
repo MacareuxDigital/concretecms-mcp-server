@@ -1,6 +1,6 @@
 import * as client from 'openid-client'
-import { createServer } from 'http'
-import { exec } from 'child_process'
+import { createServer } from 'node:http'
+import { exec } from 'node:child_process'
 import { config } from './oidc.js'
 import { scope } from '../env.js'
 import { saveTokens } from '../tokenStore.js'

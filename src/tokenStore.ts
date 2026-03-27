@@ -1,4 +1,4 @@
-import { existsSync, readFileSync, writeFileSync } from 'fs'
+import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { TOKEN_FILE } from './paths.js'
 
 export interface StoredTokens {
