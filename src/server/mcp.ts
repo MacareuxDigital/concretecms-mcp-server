@@ -1,4 +1,3 @@
-// @ts-ignore
 import { OpenAPIServer, AuthProvider } from '@ivotoby/openapi-mcp-server'
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { canonical_url } from '../env.js'
@@ -14,7 +13,7 @@ export async function startMcpServer(authProvider: AuthProvider): Promise<void> 
     openApiSpec: OPENAPI_SPEC_FILE,
     specInputMethod: 'file' as const,
     transportType: 'stdio' as const,
-    toolMode: 'all' as const,
+    toolsMode: 'all' as const,
     disableAbbreviation: true,
     authProvider,
   }
