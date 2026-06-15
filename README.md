@@ -7,7 +7,7 @@ A [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) server for [C
 ```bash
 git clone https://github.com/MacareuxDigital/concretecms-mcp-server.git
 cd concretecms-mcp-server
-npm install && npm run build
+npm ci && npm run build
 ```
 
 ## Usage
