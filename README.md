@@ -47,6 +47,8 @@ Here's an example configuration for Claude Desktop:
 After you've configured the MCP server, please restart Claude Desktop. It'll automatically opens an authorization window, then sign in and authorize the requested scopes.
 Now you should be able to get information about your Concrete CMS in a chat. A refresh token will be saved in `.tokens.json` in the `concretecms-mcp-server` directory, so you don't need to sign in again.
 
+> For a detailed, step-by-step setup walkthrough — including enabling the API, registering the integration, the required `.htaccess` Authorization-header pass-through, re-authorizing, and a list of common gotchas — see **[SETUP.md](SETUP.md)**.
+
 ![Screenshot of a chat with Claude Desktop and a Concrete CMS MCP Server](docs/screenshot.png)
 
 For more information about local MCP servers, please refer to the [Claude Desktop documentation](https://modelcontextprotocol.io/docs/develop/connect-local-servers).
