@@ -44,12 +44,18 @@ Here's an example configuration for Claude Desktop:
 - Set `CONCRETE_API_CLIENT_ID` and `CONCRETE_API_CLIENT_SECRET` to the credentials of a registered API integration.
 - Set `CONCRETE_API_SCOPE` to the scopes you want to request. You can find a list of available scopes from `https://your-concrete.example/index.php/dashboard/system/api/scopes`.
 
-After you've configured the MCP server, please restart Claude Desktop. It'll automatically opens an authorization window, then sign in and authorize the requested scopes.
-Now you should be able to get information about your Concrete CMS in a chat. A refresh token will be saved in `.tokens.json` in the `concretecms-mcp-server` directory, so you don't need to sign in again.
+After you've configured the MCP server, please restart Claude Desktop. On the first tool call, it will open an authorization window — sign in and authorize the requested scopes.
+Now you should be able to get information about your Concrete CMS in a chat. A refresh token will be saved in `~/.concretecms-mcp/tokens/local.tokens.json`, so you don't need to sign in again.
+
+Optionally set `TOKEN_ENCRYPTION_KEY` in the `env` block to encrypt tokens at rest. See the **[Security Guide](docs/security.md)** for details.
 
 ![Screenshot of a chat with Claude Desktop and a Concrete CMS MCP Server](docs/screenshot.png)
 
 For more information about local MCP servers, please refer to the [Claude Desktop documentation](https://modelcontextprotocol.io/docs/develop/connect-local-servers).
+
+### Security
+
+OAuth refresh tokens are stored on disk under `~/.concretecms-mcp/tokens/` by default. See the **[Security Guide](docs/security.md)** for the threat model, `chmod 600` behavior, encryption, cleanup commands, and remote deployment guidance.
 
 ### Run as a remote MCP server
 

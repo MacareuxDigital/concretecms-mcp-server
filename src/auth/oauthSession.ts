@@ -5,6 +5,8 @@ export interface OAuthSession {
   codeVerifier: string
   parameters: Record<string, string>
   createdAt: number
+  intendedUserId?: number
+  lockUserId: string
 }
 
 const SESSION_TTL_MS = 10 * 60 * 1000
@@ -22,7 +24,9 @@ function cleanupExpiredSessions(): void {
 
 export async function createOAuthSession(
   redirectUri: string,
-  requestedScope: string
+  requestedScope: string,
+  intendedUserId?: number,
+  lockUserId = intendedUserId !== undefined ? String(intendedUserId) : 'pending-oauth'
 ): Promise<{ state: string; authorizationUrl: URL; parameters: Record<string, string> }> {
   const codeVerifier = client.randomPKCECodeVerifier()
   const codeChallenge = await client.calculatePKCECodeChallenge(codeVerifier)
@@ -40,6 +44,8 @@ export async function createOAuthSession(
     codeVerifier,
     parameters,
     createdAt: Date.now(),
+    intendedUserId,
+    lockUserId,
   })
 
   cleanupExpiredSessions()

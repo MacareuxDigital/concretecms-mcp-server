@@ -13,7 +13,9 @@ services:
       CONCRETE_API_CLIENT_ID: ${CONCRETE_API_CLIENT_ID}
       CONCRETE_API_CLIENT_SECRET: ${CONCRETE_API_CLIENT_SECRET}
       CONCRETE_API_SCOPE: ${CONCRETE_API_SCOPE}
-      TOKEN_FILE: /data/.tokens.json
+      TOKEN_ENCRYPTION_KEY: ${TOKEN_ENCRYPTION_KEY}
+      MCP_API_KEY: ${MCP_API_KEY}
+      TOKEN_DIR: /data/tokens
     volumes:
       - mcp-tokens:/data
     restart: unless-stopped

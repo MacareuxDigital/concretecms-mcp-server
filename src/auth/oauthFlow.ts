@@ -2,11 +2,12 @@ import * as client from 'openid-client'
 import { createServer } from 'node:http'
 import { exec } from 'node:child_process'
 import { config } from './oidc.js'
-import { httpPort, scope } from '../env.js'
-import { RefreshTokenGrantProvider } from './RefreshTokenGrantProvider.js'
-import { applyTokensToProvider, exchangeAuthorizationCode } from './oauthTokens.js'
+import { httpPort, scope, stdioUserKey } from '../env.js'
+import { UserTokenSession } from './UserTokenSession.js'
+import { exchangeAuthorizationCode, saveTokensForStdioUser } from './oauthTokens.js'
+import { redactError } from '../utils/redact.js'
 
-export async function performOAuthFlow(authProvider: RefreshTokenGrantProvider): Promise<void> {
+export async function performOAuthFlow(authProvider: UserTokenSession): Promise<void> {
   const redirect_uri = `http://localhost:${httpPort}/callback`
   const code_verifier = client.randomPKCECodeVerifier()
   const code_challenge = await client.calculatePKCECodeChallenge(code_verifier)
@@ -47,9 +48,10 @@ export async function performOAuthFlow(authProvider: RefreshTokenGrantProvider):
       } else if (url.pathname === '/callback') {
         try {
           const getCurrentUrl = () => new URL(req.url!, `http://localhost:${httpPort}`)
-          console.error('[concretecms-mcp] Received callback with code:', url.searchParams.get('code'))
+          console.error('[concretecms-mcp] Processing local OAuth callback')
           const tokens = await exchangeAuthorizationCode(getCurrentUrl(), code_verifier)
-          applyTokensToProvider(authProvider, tokens, parameters)
+          const stored = await saveTokensForStdioUser(stdioUserKey, tokens, parameters)
+          authProvider.applyTokens(stored)
 
           res.writeHead(200, { 'Content-Type': 'text/html' })
           res.end(`
@@ -69,7 +71,7 @@ export async function performOAuthFlow(authProvider: RefreshTokenGrantProvider):
           httpServer.close()
           resolve()
         } catch (error) {
-          console.error('[concretecms-mcp] Token exchange failed:', error)
+          console.error(`[concretecms-mcp] Token exchange failed: ${redactError(error)}`)
 
           res.writeHead(400, { 'Content-Type': 'text/html' })
           res.end(`
@@ -80,7 +82,7 @@ export async function performOAuthFlow(authProvider: RefreshTokenGrantProvider):
             </head>
             <body>
               <h1>Authorization Failed</h1>
-              <p>Error: ${error instanceof Error ? error.message : 'Unknown error'}</p>
+              <p>Authorization could not be completed. Please try again.</p>
             </body>
             </html>
           `)
@@ -102,7 +104,7 @@ export async function performOAuthFlow(authProvider: RefreshTokenGrantProvider):
         console.error(`[concretecms-mcp]   lsof -ti:${httpPort} | xargs kill -9`)
         reject(new Error(`Port ${httpPort} is already in use. Please free the port and try again.`))
       } else {
-        console.error('[concretecms-mcp] Server error:', error)
+        console.error(`[concretecms-mcp] Server error: ${redactError(error)}`)
         reject(error)
       }
     })

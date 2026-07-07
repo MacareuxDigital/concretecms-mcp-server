@@ -58,7 +58,10 @@ export const mcpEndpointPath = prefixedPath('/mcp', 'MCP_ENDPOINT_PATH', pathPre
 export const oauthCallbackPath = prefixedPath('/oauth/callback', 'OAUTH_CALLBACK_PATH', pathPrefix)
 export const oauthStartPath = prefixedPath('/oauth/start', 'OAUTH_START_PATH', pathPrefix)
 export const oauthStatusPath = prefixedPath('/oauth/status', 'OAUTH_STATUS_PATH', pathPrefix)
+export const oauthRevokePath = prefixedPath('/oauth/revoke', 'OAUTH_REVOKE_PATH', pathPrefix)
 export const healthPath = prefixedPath('/health', 'HEALTH_PATH', pathPrefix)
+
+export const stdioUserKey = optionalEnv('CONCRETE_USER_ID', 'local')
 
 function normalizeBaseUrl(url: string): string {
   return url.replace(/\/$/, '')
@@ -78,3 +81,69 @@ export const publicBaseUrl = (() => {
 })()
 
 export const oauthRedirectUri = `${publicBaseUrl}${oauthCallbackPath}`
+
+export type McpApiKeyEntry = {
+  key: string
+  boundUserId: number | null
+}
+
+function parseMcpApiKeys(): McpApiKeyEntry[] {
+  const keysJson = process.env.MCP_API_KEYS
+  if (keysJson) {
+    let parsed: Record<string, number | null>
+    try {
+      parsed = JSON.parse(keysJson) as Record<string, number | null>
+    } catch {
+      throw new Error('Invalid MCP_API_KEYS: must be valid JSON object mapping keys to user IDs or null')
+    }
+
+    return Object.entries(parsed).map(([key, boundUserId]) => ({
+      key,
+      boundUserId: boundUserId === null ? null : boundUserId,
+    }))
+  }
+
+  const singleKey = process.env.MCP_API_KEY
+  if (singleKey) {
+    return [{ key: singleKey, boundUserId: null }]
+  }
+
+  return []
+}
+
+export const mcpApiKeys = parseMcpApiKeys()
+
+export const tokenEncryptionKey = process.env.TOKEN_ENCRYPTION_KEY ?? null
+
+let stdioEncryptionWarningShown = false
+
+export function getTokenEncryptionKey(): string | null {
+  return tokenEncryptionKey
+}
+
+export function validateHttpSecrets(): void {
+  if (transportType !== 'http') {
+    return
+  }
+
+  if (!tokenEncryptionKey) {
+    throw new Error('Missing required environment variable: TOKEN_ENCRYPTION_KEY (required when TRANSPORT_TYPE=http)')
+  }
+
+  if (mcpApiKeys.length === 0) {
+    throw new Error('Missing required environment variable: MCP_API_KEY or MCP_API_KEYS (required when TRANSPORT_TYPE=http)')
+  }
+}
+
+export function warnStdioEncryptionOnce(): void {
+  if (transportType !== 'stdio' || tokenEncryptionKey || stdioEncryptionWarningShown) {
+    return
+  }
+
+  stdioEncryptionWarningShown = true
+  console.error(
+    '[concretecms-mcp] Warning: TOKEN_ENCRYPTION_KEY is not set. Tokens will be stored in plaintext. Set TOKEN_ENCRYPTION_KEY to encrypt tokens at rest.'
+  )
+}
+
+validateHttpSecrets()
