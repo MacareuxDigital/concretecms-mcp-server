@@ -156,6 +156,17 @@ const migration = spawn('node', ['-e', `
 await new Promise((resolve) => migration.on('close', resolve))
 assert(migration.exitCode === 0, 'legacy .tokens.json migrates to site-scoped local.tokens.json (stdio)')
 
+console.log('\nAccount response parsing test')
+
+const { extractUserId } = await import(`file://${join(projectRoot, 'dist/auth/resolveUser.js')}?t=${Date.now()}`)
+
+assert(
+  extractUserId({ data: { id: 1, username: 'admin' } }) === 1,
+  'extractUserId reads nested data.id'
+)
+assert(extractUserId({ id: '2' }) === 2, 'extractUserId reads top-level string id')
+assert(extractUserId({ data: {} }) === null, 'extractUserId returns null when id missing')
+
 console.log('\nHTTP server auth tests')
 
 const server = spawn('node', ['dist/index.js'], {
