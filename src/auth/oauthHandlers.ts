@@ -3,14 +3,25 @@ import {
   healthPath,
   oauthCallbackPath,
   oauthRedirectUri,
+  oauthRevokePath,
   oauthStartPath,
   oauthStatusPath,
   publicBaseUrl,
   scope,
+  transportType,
 } from '../env.js'
-import { RefreshTokenGrantProvider } from './RefreshTokenGrantProvider.js'
+import { clearTokens } from '../tokenStore.js'
+import { MultiUserAuthProvider } from './MultiUserAuthProvider.js'
+import { acquireOAuthStartLock, releaseOAuthStartLock } from './authCoordinator.js'
 import { consumeOAuthSession, createOAuthSession } from './oauthSession.js'
-import { applyTokensToProvider, exchangeAuthorizationCode } from './oauthTokens.js'
+import { exchangeAuthorizationCode, saveTokensForUser } from './oauthTokens.js'
+import { parseOAuthUserId, validateOAuthApiKey } from '../server/authMiddleware.js'
+import { sendJson, blockFurtherResponseWrites } from '../server/httpResponse.js'
+import { redactError } from '../utils/redact.js'
+
+const RATE_LIMIT_WINDOW_MS = 60_000
+const RATE_LIMIT_MAX_REQUESTS = 10
+const rateLimitBuckets = new Map<string, number[]>()
 
 function isOriginAllowed(req: IncomingMessage): boolean {
   const origin = req.headers.origin
@@ -40,36 +51,113 @@ function sendHtml(res: ServerResponse, statusCode: number, title: string, body: 
     </body>
     </html>
   `)
+  blockFurtherResponseWrites(res)
 }
 
-function sendJson(res: ServerResponse, statusCode: number, payload: unknown): void {
-  res.writeHead(statusCode, { 'Content-Type': 'application/json' })
-  res.end(JSON.stringify(payload))
+function getClientIp(req: IncomingMessage): string {
+  const forwarded = req.headers['x-forwarded-for']
+  if (typeof forwarded === 'string' && forwarded.length > 0) {
+    return forwarded.split(',')[0]?.trim() ?? 'unknown'
+  }
+  return req.socket.remoteAddress ?? 'unknown'
+}
+
+function isRateLimited(key: string): boolean {
+  const now = Date.now()
+  const timestamps = rateLimitBuckets.get(key) ?? []
+  const recent = timestamps.filter((timestamp) => now - timestamp < RATE_LIMIT_WINDOW_MS)
+
+  if (recent.length >= RATE_LIMIT_MAX_REQUESTS) {
+    rateLimitBuckets.set(key, recent)
+    return true
+  }
+
+  recent.push(now)
+  rateLimitBuckets.set(key, recent)
+  return false
+}
+
+function parsePositiveUserId(value: string | null): number | undefined {
+  if (!value) {
+    return undefined
+  }
+
+  const parsed = Number.parseInt(value, 10)
+  if (!Number.isInteger(parsed) || parsed <= 0) {
+    return undefined
+  }
+
+  return parsed
 }
 
 async function handleOAuthStart(
   req: IncomingMessage,
   res: ServerResponse,
-  authProvider: RefreshTokenGrantProvider
+  url: URL
 ): Promise<void> {
+  if (res.writableEnded) {
+    return
+  }
+
+  if (transportType === 'http' && !validateOAuthApiKey(req)) {
+    sendJson(res, 401, { error: 'Unauthorized' })
+    return
+  }
+
   if (!isOriginAllowed(req)) {
     sendJson(res, 403, { error: 'Origin not allowed' })
     return
   }
 
-  const { authorizationUrl } = await createOAuthSession(oauthRedirectUri, scope || 'account:read')
+  const clientIp = getClientIp(req)
+  if (isRateLimited(`oauth-start:${clientIp}`)) {
+    sendJson(res, 429, { error: 'Too many requests' })
+    return
+  }
 
-  res.writeHead(302, { Location: authorizationUrl.toString() })
-  res.end()
+  const intendedUserId = parsePositiveUserId(url.searchParams.get('user_id'))
+  const lockUserId = intendedUserId !== undefined ? String(intendedUserId) : 'pending-oauth'
+
+  if (!acquireOAuthStartLock(lockUserId)) {
+    sendJson(res, 409, { error: 'OAuth already in progress for this user' })
+    return
+  }
+
+  try {
+    const { authorizationUrl } = await createOAuthSession(
+      oauthRedirectUri,
+      scope || 'account:read',
+      intendedUserId,
+      lockUserId
+    )
+
+    res.writeHead(302, { Location: authorizationUrl.toString() })
+    res.end()
+    blockFurtherResponseWrites(res)
+  } catch (error) {
+    releaseOAuthStartLock(lockUserId)
+    console.error(`[concretecms-mcp] OAuth start failed: ${redactError(error)}`)
+    sendJson(res, 500, { error: 'Failed to start OAuth flow' })
+  }
 }
 
 async function handleOAuthCallback(
   req: IncomingMessage,
   res: ServerResponse,
-  authProvider: RefreshTokenGrantProvider
+  authProvider: MultiUserAuthProvider
 ): Promise<void> {
+  if (res.writableEnded) {
+    return
+  }
+
   if (!isOriginAllowed(req)) {
     sendJson(res, 403, { error: 'Origin not allowed' })
+    return
+  }
+
+  const clientIp = getClientIp(req)
+  if (isRateLimited(`oauth-callback:${clientIp}`)) {
+    sendJson(res, 429, { error: 'Too many requests' })
     return
   }
 
@@ -88,62 +176,133 @@ async function handleOAuthCallback(
   }
 
   try {
-    console.error('[concretecms-mcp] Received callback with code:', callbackUrl.searchParams.get('code'))
+    console.error('[concretecms-mcp] Processing OAuth callback')
     const tokens = await exchangeAuthorizationCode(callbackUrl, session.codeVerifier, state)
-    applyTokensToProvider(authProvider, tokens, session.parameters)
+    const { userId, stored } = await saveTokensForUser(
+      tokens,
+      session.parameters,
+      session.intendedUserId
+    )
+
+    authProvider.getSessionForUser(userId).applyTokens(stored)
 
     sendHtml(
       res,
       200,
       'Authorization Successful',
-      '<h1>Authorization Successful!</h1><p>You can close this window and return to the application.</p>'
+      `<h1>Authorization Successful!</h1><p>User ${userId} is now authorized. You can close this window and return to the application.</p>`
     )
   } catch (error) {
-    console.error('[concretecms-mcp] Token exchange failed:', error)
+    console.error(`[concretecms-mcp] Token exchange failed: ${redactError(error)}`)
     sendHtml(
       res,
       400,
       'Authorization Failed',
-      `<h1>Authorization Failed</h1><p>Error: ${error instanceof Error ? error.message : 'Unknown error'}</p>`
+      '<h1>Authorization Failed</h1><p>Authorization could not be completed. Please try again.</p>'
     )
+  } finally {
+    releaseOAuthStartLock(session.lockUserId)
   }
 }
 
-function handleOAuthStatus(res: ServerResponse, authProvider: RefreshTokenGrantProvider): void {
+function handleOAuthStatus(
+  req: IncomingMessage,
+  res: ServerResponse,
+  url: URL,
+  authProvider: MultiUserAuthProvider
+): void {
+  if (res.writableEnded) {
+    return
+  }
+
+  if (transportType === 'http' && !validateOAuthApiKey(req)) {
+    sendJson(res, 401, { error: 'Unauthorized' })
+    return
+  }
+
+  const userId = parseOAuthUserId(req, url) ?? url.searchParams.get('user_id')
+  if (!userId) {
+    sendJson(res, 400, { error: 'Missing or invalid user_id' })
+    return
+  }
+
+  const userKey = String(userId)
+  const authenticated = authProvider.isAuthenticated(userKey)
+
   sendJson(res, 200, {
-    authenticated: authProvider.isAuthenticated(),
-    expiresAt: authProvider.getExpiresAt(),
+    userId: Number.parseInt(userKey, 10),
+    authenticated,
+    expiresAt: authenticated ? authProvider.getExpiresAt(userKey) : undefined,
   })
 }
 
+function handleOAuthRevoke(
+  req: IncomingMessage,
+  res: ServerResponse,
+  url: URL,
+  authProvider: MultiUserAuthProvider
+): void {
+  if (res.writableEnded) {
+    return
+  }
+
+  if (transportType === 'http' && !validateOAuthApiKey(req)) {
+    sendJson(res, 401, { error: 'Unauthorized' })
+    return
+  }
+
+  const userId = parseOAuthUserId(req, url) ?? url.searchParams.get('user_id')
+  if (!userId) {
+    sendJson(res, 400, { error: 'Missing or invalid user_id' })
+    return
+  }
+
+  const userKey = String(userId)
+  clearTokens(userKey)
+  authProvider.clearUser(userKey)
+
+  sendJson(res, 200, { revoked: true, userId: Number.parseInt(userKey, 10) })
+}
+
 function handleHealth(res: ServerResponse): void {
+  if (res.writableEnded) {
+    return
+  }
+
   sendJson(res, 200, { status: 'healthy' })
 }
 
-export function attachOAuthHandlers(server: Server, authProvider: RefreshTokenGrantProvider): void {
+export function attachOAuthHandlers(server: Server, authProvider: MultiUserAuthProvider): void {
   server.on('request', (req, res) => {
-    if (!req.url || req.method !== 'GET') {
+    if (!req.url || res.writableEnded) {
       return
     }
 
     const url = new URL(req.url, publicBaseUrl)
 
-    if (url.pathname === oauthStartPath) {
-      void handleOAuthStart(req, res, authProvider)
+    if (url.pathname === oauthStartPath && req.method === 'GET') {
+      void handleOAuthStart(req, res, url)
       return
     }
 
-    if (url.pathname === oauthCallbackPath) {
+    if (url.pathname === oauthCallbackPath && req.method === 'GET') {
       void handleOAuthCallback(req, res, authProvider)
       return
     }
 
-    if (url.pathname === oauthStatusPath) {
-      handleOAuthStatus(res, authProvider)
+    if (url.pathname === oauthStatusPath && req.method === 'GET') {
+      handleOAuthStatus(req, res, url, authProvider)
       return
     }
 
-    if (url.pathname === healthPath) {
+    if (url.pathname === oauthRevokePath && req.method === 'POST') {
+      handleOAuthRevoke(req, res, url, authProvider)
+      return
+    }
+
+    // /health is handled by the MCP transport library when PATH_PREFIX is unset.
+    // Custom health paths (with PATH_PREFIX) are handled here.
+    if (url.pathname === healthPath && req.method === 'GET' && healthPath !== '/health') {
       handleHealth(res)
     }
   })
