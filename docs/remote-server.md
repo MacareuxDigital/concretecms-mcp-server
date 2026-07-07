@@ -1,18 +1,26 @@
 # Remote MCP Server Guide
 
-Use remote mode when a remote MCP client needs to connect over HTTP instead of spawning a local stdio process. This is useful for hosted AI agents, CMS dashboards, or personal clients using the `mcp-remote` bridge.
+Use remote mode when a remote MCP client needs to connect over HTTP instead of spawning a local stdio process. This is useful for hosted AI agents, CMS dashboards, and custom MCP clients.
 
 The server exposes a [Streamable HTTP](https://modelcontextprotocol.io/specification/2025-03-26/basic/transports) MCP endpoint and persistent OAuth routes.
 
 For local stdio mode (Claude Desktop spawning the process), see the [main README](../README.md).
 
-## Client modes
+For building MCP clients and AI agents that call this server, see the **[MCP Client Developer Guide](mcp-client-guide.md)**.
 
-| Mode | Client | Auth headers |
-|------|--------|--------------|
-| **A. Local stdio** | Claude Desktop spawns `node dist/index.js` | None (single `local` user) |
-| **B. Personal remote** | Claude Desktop → `mcp-remote` → remote `/mcp` | `Authorization` + `X-Concrete-User-Id` (or user-bound API key) |
-| **C. Dashboard** | CMS backend → remote `/mcp` | `Authorization` + `X-Concrete-User-Id` per session |
+## Client integration
+
+Remote clients authenticate with `Authorization: Bearer <MCP_API_KEY>` and identify the CMS user with `X-Concrete-User-Id` on every `/mcp` request.
+
+| Integration | Description |
+|-------------|-------------|
+| **Backend agent** | Your service calls `/mcp` and OAuth admin routes |
+| **Web app proxy** | Your API forwards to `/mcp`; API key stays server-side |
+| **CMS package** | Dashboard controller proxies to `/mcp` using session user ID |
+
+See the **[MCP Client Developer Guide](mcp-client-guide.md)** for HTTP API details, OAuth flow, and implementation patterns.
+
+For local stdio (Claude Desktop) or personal `mcp-remote` bridge setup, see the [main README](../README.md).
 
 See the [Security Guide](security.md) for the full trust model.
 
@@ -69,8 +77,8 @@ Each CMS user must authorize separately. API calls use the token for the user sp
 ### Authorize a user
 
 ```bash
-# Obtain redirect URL (open Location in browser)
-curl -sI -H "Authorization: Bearer $MCP_API_KEY" \
+# Obtain redirect URL (open Location in browser) — use GET, not HEAD
+curl -s -D - -o /dev/null -H "Authorization: Bearer $MCP_API_KEY" \
   "https://mcp.example.com/oauth/start?user_id=42"
 ```
 
@@ -320,67 +328,18 @@ Reload your proxy after changing the configuration.
 
 ## Connect a remote MCP client
 
-### Mode C — CMS dashboard backend
+See the **[MCP Client Developer Guide](mcp-client-guide.md)** for the full HTTP API reference, per-user OAuth flow, agent loops, and implementation patterns (backend service, web app proxy, CMS package).
 
-Send on every `/mcp` request:
+Quick reference — send on every `/mcp` request:
 
 ```
 Authorization: Bearer <MCP_API_KEY>
 X-Concrete-User-Id: <cms_user_id>
 ```
 
-Poll `/oauth/status?user_id=<id>` before enabling AI for a user. Trigger `/oauth/start?user_id=<id>` when not authenticated.
+Poll `/oauth/status?user_id=<id>` before enabling AI for a user. Trigger `GET /oauth/start?user_id=<id>` when not authenticated.
 
-### Mode B — Claude Desktop via mcp-remote
-
-Claude Desktop connects through a local stdio bridge. Add to `claude_desktop_config.json`:
-
-```json
-{
-  "mcpServers": {
-    "concretecms-remote": {
-      "command": "npx",
-      "args": [
-        "-y",
-        "mcp-remote",
-        "https://mcp.example.com/mcp",
-        "--transport",
-        "http-only",
-        "--header",
-        "Authorization:${MCP_AUTH}",
-        "--header",
-        "X-Concrete-User-Id:${CONCRETE_USER_ID}"
-      ],
-      "env": {
-        "MCP_AUTH": "Bearer your-mcp-api-key",
-        "CONCRETE_USER_ID": "42"
-      }
-    }
-  }
-}
-```
-
-Authorize first:
-
-```bash
-curl -sI -H "Authorization: Bearer your-mcp-api-key" \
-  "https://mcp.example.com/oauth/start"
-```
-
-Alternatively, bind a personal API key to a user with `MCP_API_KEYS` so only `Authorization` is needed.
-
-### Example MCP request
-
-```bash
-curl -X POST https://mcp.example.com/mcp \
-  -H "Content-Type: application/json" \
-  -H "Accept: application/json, text/event-stream" \
-  -H "Authorization: Bearer your-mcp-api-key" \
-  -H "X-Concrete-User-Id: 42" \
-  -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-03-26","capabilities":{},"clientInfo":{"name":"test","version":"1.0.0"}}}'
-```
-
-Requests without `Authorization` return `401`. Requests without user context return `400`.
+For Claude Desktop or `mcp-remote` personal bridge setup, see the [main README](../README.md).
 
 ## Docker deployment (alternative)
 

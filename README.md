@@ -65,6 +65,12 @@ To host the MCP server on a remote Linux server, see the **[Remote MCP Server Gu
 
 It covers systemd deployment, reverse proxy setup, OAuth configuration, and Docker as an alternative.
 
+### For developers: build an MCP client or AI agent
+
+If you are building a programmatic MCP client or AI agent (backend service, web app with chat UI, or Concrete CMS package) that connects to a remote MCP server over HTTP, see the **[MCP Client Developer Guide](docs/mcp-client-guide.md)**.
+
+It covers the HTTP API, per-user OAuth, agent loops, and implementation patterns. It does not cover Claude Desktop or Cursor configuration — use the local stdio section above for that.
+
 ### Use your own OpenAPI specification
 
 The MCP server is loading `openapi.yml` to know which endpoints are available in the Concrete CMS API.
