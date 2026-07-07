@@ -1,0 +1,22 @@
+services:
+  concretecms-mcp:
+    build: .
+    ports:
+      - "${HTTP_PORT:-3000}:3000"
+    environment:
+      TRANSPORT_TYPE: http
+      HTTP_HOST: 0.0.0.0
+      HTTP_PORT: 3000
+      PUBLIC_BASE_URL: ${PUBLIC_BASE_URL}
+      PATH_PREFIX: ${PATH_PREFIX:-}
+      CONCRETE_CANONICAL_URL: ${CONCRETE_CANONICAL_URL}
+      CONCRETE_API_CLIENT_ID: ${CONCRETE_API_CLIENT_ID}
+      CONCRETE_API_CLIENT_SECRET: ${CONCRETE_API_CLIENT_SECRET}
+      CONCRETE_API_SCOPE: ${CONCRETE_API_SCOPE}
+      TOKEN_FILE: /data/.tokens.json
+    volumes:
+      - mcp-tokens:/data
+    restart: unless-stopped
+
+volumes:
+  mcp-tokens:

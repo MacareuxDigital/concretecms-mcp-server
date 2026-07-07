@@ -51,6 +51,12 @@ Now you should be able to get information about your Concrete CMS in a chat. A r
 
 For more information about local MCP servers, please refer to the [Claude Desktop documentation](https://modelcontextprotocol.io/docs/develop/connect-local-servers).
 
+### Run as a remote MCP server
+
+To host the MCP server on a Linux server (for use from the Concrete CMS dashboard or other remote clients), see the **[Remote MCP Server Guide](docs/remote-server.md)**.
+
+It covers systemd deployment on Amazon Linux, nginx reverse proxy, OAuth setup, and Docker as an alternative.
+
 ### Use your own OpenAPI specification
 
 The MCP server is loading `openapi.yml` to know which endpoints are available in the Concrete CMS API.
@@ -80,7 +86,6 @@ You can find a list of all available endpoints in [Concrete CMS REST API - Endpo
 - Test with other MCP clients.
 - Add useful prompts.
 - Support another authentication method than OAuth2.
-- Support to build a remote MCP server (Streamable HTTP Transport).
 
 ## License
 
