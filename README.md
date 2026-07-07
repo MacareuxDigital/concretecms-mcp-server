@@ -53,9 +53,9 @@ For more information about local MCP servers, please refer to the [Claude Deskto
 
 ### Run as a remote MCP server
 
-To host the MCP server on a Linux server (for use from the Concrete CMS dashboard or other remote clients), see the **[Remote MCP Server Guide](docs/remote-server.md)**.
+To host the MCP server on a remote Linux server, see the **[Remote MCP Server Guide](docs/remote-server.md)**.
 
-It covers systemd deployment on Amazon Linux, nginx reverse proxy, OAuth setup, and Docker as an alternative.
+It covers systemd deployment, reverse proxy setup, OAuth configuration, and Docker as an alternative.
 
 ### Use your own OpenAPI specification
 
