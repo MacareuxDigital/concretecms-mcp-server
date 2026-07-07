@@ -3,12 +3,13 @@ import {
   mkdirSync,
   readdirSync,
   readFileSync,
+  statSync,
   unlinkSync,
   writeFileSync,
 } from 'node:fs'
 import { hostname } from 'node:os'
 import { join } from 'node:path'
-import { TOKEN_DIR } from '../paths.js'
+import { getTokenBaseDir, getTokenDir } from '../paths.js'
 
 const LOCK_MAX_AGE_MS = 10 * 60 * 1000
 export const OAUTH_LOCK_WAIT_TIMEOUT_MS = 10 * 60 * 1000
@@ -20,13 +21,14 @@ interface LockData {
 }
 
 function ensureTokenDir(): void {
-  if (!existsSync(TOKEN_DIR)) {
-    mkdirSync(TOKEN_DIR, { recursive: true, mode: 0o700 })
+  const tokenDir = getTokenDir()
+  if (!existsSync(tokenDir)) {
+    mkdirSync(tokenDir, { recursive: true, mode: 0o700 })
   }
 }
 
 function lockFilePath(userId: string): string {
-  return join(TOKEN_DIR, `${userId}.auth.lock`)
+  return join(getTokenDir(), `${userId}.auth.lock`)
 }
 
 function readLockData(path: string): LockData | null {
@@ -129,22 +131,41 @@ export function releaseOAuthLock(userId: string): void {
 }
 
 export function cleanupStaleOAuthLocks(): number {
-  if (!existsSync(TOKEN_DIR)) {
+  const tokenBaseDir = getTokenBaseDir()
+  if (!existsSync(tokenBaseDir)) {
     return 0
   }
 
   let removed = 0
+  const dirs = [getTokenDir()]
 
-  for (const file of readdirSync(TOKEN_DIR)) {
-    if (!file.endsWith('.auth.lock')) {
+  for (const entry of readdirSync(tokenBaseDir)) {
+    const path = join(tokenBaseDir, entry)
+    try {
+      if (statSync(path).isDirectory()) {
+        dirs.push(path)
+      }
+    } catch {
+      // skip
+    }
+  }
+
+  for (const dir of dirs) {
+    if (!existsSync(dir)) {
       continue
     }
 
-    const path = join(TOKEN_DIR, file)
-    const lockData = readLockData(path)
-    if (!lockData || !isLockValid(lockData)) {
-      removeLock(path)
-      removed++
+    for (const file of readdirSync(dir)) {
+      if (!file.endsWith('.auth.lock')) {
+        continue
+      }
+
+      const path = join(dir, file)
+      const lockData = readLockData(path)
+      if (!lockData || !isLockValid(lockData)) {
+        removeLock(path)
+        removed++
+      }
     }
   }
 

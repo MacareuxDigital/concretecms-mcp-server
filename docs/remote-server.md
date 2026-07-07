@@ -28,7 +28,7 @@ See the [Security Guide](security.md) for the full trust model.
 | `PATH_PREFIX` | No | _(empty)_ | Path prefix for all routes, e.g. `/ccm-mcp` |
 | `HTTP_HOST` | No | `0.0.0.0` | Bind address |
 | `HTTP_PORT` | No | `3000` | Listen port |
-| `TOKEN_DIR` | No | `~/.concretecms-mcp/tokens` | Per-user encrypted token directory |
+| `TOKEN_DIR` | No | `~/.concretecms-mcp/tokens` | Base token directory; per-site subdirs are created automatically |
 | `MCP_ENDPOINT_PATH` | No | `{PATH_PREFIX}/mcp` | Streamable HTTP MCP endpoint |
 | `OAUTH_START_PATH` | No | `{PATH_PREFIX}/oauth/start` | OAuth initiation path |
 | `OAUTH_CALLBACK_PATH` | No | `{PATH_PREFIX}/oauth/callback` | OAuth redirect path |
@@ -74,7 +74,7 @@ curl -sI -H "Authorization: Bearer $MCP_API_KEY" \
   "https://mcp.example.com/oauth/start?user_id=42"
 ```
 
-Sign in to CMS as that user and approve scopes. Tokens are saved on the server as `{userId}.tokens.json` and `{userId}.client.json` under `TOKEN_DIR`.
+Sign in to CMS as that user and approve scopes. Tokens are saved on the server as `{userId}.tokens.json` and `{userId}.client.json` under `TOKEN_DIR/<siteKey>/` (derived from `CONCRETE_CANONICAL_URL`).
 
 If another OAuth flow is already running for that user, `/oauth/start` returns `409`.
 

@@ -7,12 +7,23 @@ import { join, dirname } from 'node:path'
 import { tmpdir } from 'node:os'
 import { fileURLToPath } from 'node:url'
 import { spawn } from 'node:child_process'
+import { createHash } from 'node:crypto'
 
 const projectRoot = join(dirname(fileURLToPath(import.meta.url)), '..')
 const testDir = mkdtempSync(join(tmpdir(), 'concretecms-mcp-test-'))
 const tokenDir = join(testDir, 'tokens')
 const encryptionKey = Buffer.alloc(32, 7).toString('base64')
 const mcpApiKey = 'test-mcp-api-key-12345678'
+const cmsUrl = 'https://cms.example.com'
+
+function siteKey(url) {
+  const parsed = new URL(url)
+  const pathname = parsed.pathname.replace(/\/$/, '')
+  const normalized = `${parsed.origin}${pathname}`.toLowerCase()
+  return createHash('sha256').update(normalized).digest('hex').slice(0, 16)
+}
+
+const cmsSiteDir = join(tokenDir, siteKey(cmsUrl))
 
 let passed = 0
 let failed = 0
@@ -34,7 +45,7 @@ function baseEnv(overrides = {}) {
     TRANSPORT_TYPE: 'http',
     PUBLIC_BASE_URL: 'http://127.0.0.1:3999',
     MCP_API_KEY: mcpApiKey,
-    CONCRETE_CANONICAL_URL: 'https://cms.example.com',
+    CONCRETE_CANONICAL_URL: cmsUrl,
     CONCRETE_API_CLIENT_ID: 'test-client',
     CONCRETE_API_CLIENT_SECRET: 'test-secret',
     CONCRETE_API_SCOPE: 'account:read',
@@ -67,17 +78,57 @@ const sampleTokens = {
 saveTokens('42', sampleTokens, sampleTokens.parameters)
 const loaded = await loadTokens('42')
 assert(loaded?.access_token === 'access-abc', 'encrypt/decrypt round-trip')
-assert(existsSync(join(tokenDir, '42.tokens.json')), 'per-user tokens file created')
-assert(existsSync(join(tokenDir, '42.client.json')), 'per-user client file created')
+assert(existsSync(join(cmsSiteDir, '42.tokens.json')), 'per-user tokens file created in site directory')
+assert(existsSync(join(cmsSiteDir, '42.client.json')), 'per-user client file created in site directory')
 
-const raw = readFileSync(join(tokenDir, '42.tokens.json'), 'utf-8')
+const raw = readFileSync(join(cmsSiteDir, '42.tokens.json'), 'utf-8')
 const parsed = JSON.parse(raw)
 assert(parsed.iv && parsed.tag && parsed.data, 'file is encrypted envelope')
-assert((statSync(join(tokenDir, '42.tokens.json')).mode & 0o777) === 0o600, 'file mode 0600')
+assert((statSync(join(cmsSiteDir, '42.tokens.json')).mode & 0o777) === 0o600, 'file mode 0600')
 
 clearTokens('42')
-assert(!existsSync(join(tokenDir, '42.tokens.json')), 'clearTokens removes user tokens file')
-assert(!existsSync(join(tokenDir, '42.client.json')), 'clearTokens removes user client file')
+assert(!existsSync(join(cmsSiteDir, '42.tokens.json')), 'clearTokens removes user tokens file')
+assert(!existsSync(join(cmsSiteDir, '42.client.json')), 'clearTokens removes user client file')
+
+console.log('\nMulti-site namespace test')
+
+const siteA = 'https://site-a.example.com'
+const siteB = 'https://site-b.example.com'
+const multiSiteDir = mkdtempSync(join(tmpdir(), 'concretecms-mcp-multisite-'))
+
+const storeA = await importTokenStore({
+  ...baseEnv({ TOKEN_DIR: multiSiteDir }),
+  CONCRETE_CANONICAL_URL: siteA,
+})
+storeA.saveTokens('local', sampleTokens, sampleTokens.parameters)
+
+const storeB = await importTokenStore({
+  ...baseEnv({ TOKEN_DIR: multiSiteDir }),
+  CONCRETE_CANONICAL_URL: siteB,
+})
+assert(!storeB.loadTokens('local'), 'site B does not see site A tokens')
+
+const storeAReload = await importTokenStore({
+  ...baseEnv({ TOKEN_DIR: multiSiteDir }),
+  CONCRETE_CANONICAL_URL: siteA,
+})
+assert(storeAReload.loadTokens('local')?.access_token === 'access-abc', 'site A tokens remain isolated')
+
+console.log('\nFlat token dir migration test')
+
+const flatDir = mkdtempSync(join(tmpdir(), 'concretecms-mcp-flat-'))
+writeFileSync(join(flatDir, 'local.tokens.json'), JSON.stringify(sampleTokens), { mode: 0o600 })
+
+const flatStore = await importTokenStore({
+  ...baseEnv({ TOKEN_DIR: flatDir }),
+  CONCRETE_CANONICAL_URL: cmsUrl,
+})
+flatStore.migrateFlatTokenDir()
+assert(
+  existsSync(join(flatDir, siteKey(cmsUrl), 'local.tokens.json')),
+  'flat token files migrate into site subdirectory'
+)
+assert(!existsSync(join(flatDir, 'local.tokens.json')), 'flat token file removed after migration')
 
 console.log('\nLegacy migration test (stdio subprocess)')
 
@@ -85,6 +136,8 @@ const legacyDir = mkdtempSync(join(tmpdir(), 'concretecms-mcp-legacy-'))
 const legacyTokenDir = join(legacyDir, 'tokens')
 const legacyFile = join(legacyDir, '.tokens.json')
 writeFileSync(legacyFile, JSON.stringify(sampleTokens), { mode: 0o600 })
+
+const legacySiteDir = join(legacyTokenDir, siteKey('https://cms.example.com'))
 
 const migration = spawn('node', ['-e', `
   process.env.TRANSPORT_TYPE = 'stdio';
@@ -96,12 +149,12 @@ const migration = spawn('node', ['-e', `
   process.env.CONCRETE_API_SCOPE = 'account:read';
   import('./dist/tokenStore.js').then(m => {
     m.migrateLegacyTokens();
-    process.exit(require('fs').existsSync(${JSON.stringify(join(legacyTokenDir, 'local.tokens.json'))}) ? 0 : 1);
+    process.exit(require('fs').existsSync(${JSON.stringify(join(legacySiteDir, 'local.tokens.json'))}) ? 0 : 1);
   });
 `], { cwd: projectRoot, stdio: 'inherit' })
 
 await new Promise((resolve) => migration.on('close', resolve))
-assert(migration.exitCode === 0, 'legacy .tokens.json migrates to local.tokens.json (stdio)')
+assert(migration.exitCode === 0, 'legacy .tokens.json migrates to site-scoped local.tokens.json (stdio)')
 
 console.log('\nHTTP server auth tests')
 
@@ -143,6 +196,8 @@ try {
 
 rmSync(testDir, { recursive: true, force: true })
 rmSync(legacyDir, { recursive: true, force: true })
+rmSync(multiSiteDir, { recursive: true, force: true })
+rmSync(flatDir, { recursive: true, force: true })
 
 console.log(`\nResults: ${passed} passed, ${failed} failed`)
 process.exit(failed > 0 ? 1 : 0)

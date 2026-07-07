@@ -4,7 +4,16 @@ This document describes how the Concrete CMS MCP server stores credentials and h
 
 ## What is stored
 
-Each authorized CMS user has two token files under `TOKEN_DIR` (default: `~/.concretecms-mcp/tokens`):
+Each authorized CMS user has two token files under a site-specific directory:
+
+```
+TOKEN_DIR/<siteKey>/{userId}.tokens.json
+TOKEN_DIR/<siteKey>/{userId}.client.json
+```
+
+- `TOKEN_DIR` defaults to `~/.concretecms-mcp/tokens`
+- `<siteKey>` is a 16-character hash of `CONCRETE_CANONICAL_URL`, so one MCP install can connect to multiple Concrete CMS sites without clobbering tokens
+- Legacy flat files directly under `TOKEN_DIR/` are migrated into the site subdirectory on startup
 
 | File | Contents |
 |------|----------|
@@ -20,19 +29,21 @@ These tokens grant API access with the **same permissions as the CMS user who au
 Default location:
 
 ```
-~/.concretecms-mcp/tokens/
+~/.concretecms-mcp/tokens/<siteKey>/
 ```
 
-Override with the `TOKEN_DIR` environment variable. Recommended for local stdio mode so tokens stay outside your repository.
+The `<siteKey>` is derived from `CONCRETE_CANONICAL_URL`. Configure a different `CONCRETE_CANONICAL_URL` per site (e.g. separate Claude Desktop MCP entries) and each site gets its own token directory.
+
+Override the base directory with the `TOKEN_DIR` environment variable. Recommended for local stdio mode so tokens stay outside your repository.
 
 ### Cleanup
 
 Remove all tokens for a user:
 
 ```bash
-rm -f ~/.concretecms-mcp/tokens/{userId}.tokens.json \
-      ~/.concretecms-mcp/tokens/{userId}.client.json \
-      ~/.concretecms-mcp/tokens/{userId}.auth.lock
+rm -f ~/.concretecms-mcp/tokens/<siteKey>/{userId}.tokens.json \
+      ~/.concretecms-mcp/tokens/<siteKey>/{userId}.client.json \
+      ~/.concretecms-mcp/tokens/<siteKey>/{userId}.auth.lock
 ```
 
 Remove stale locks and tokens expired more than 30 days:
@@ -52,7 +63,7 @@ node scripts/cleanup-tokens.mjs
 When Claude Desktop spawns the server locally (`TRANSPORT_TYPE=stdio`, default):
 
 - A single user key `local` is used (override with `CONCRETE_USER_ID`)
-- Legacy `.tokens.json` in the project root is migrated to `~/.concretecms-mcp/tokens/local.*` on startup
+- Legacy `.tokens.json` in the project root is migrated to `~/.concretecms-mcp/tokens/<siteKey>/local.*` on startup
 - OAuth runs **lazily** on the first tool call (not at process startup)
 - Concurrent OAuth flows are coordinated via per-user lockfiles
 - `TOKEN_ENCRYPTION_KEY` is optional; a warning is logged if unset
