@@ -89,7 +89,7 @@ async function handleOAuthCallback(
 
   try {
     console.error('[concretecms-mcp] Received callback with code:', callbackUrl.searchParams.get('code'))
-    const tokens = await exchangeAuthorizationCode(callbackUrl, session.codeVerifier)
+    const tokens = await exchangeAuthorizationCode(callbackUrl, session.codeVerifier, state)
     applyTokensToProvider(authProvider, tokens, session.parameters)
 
     sendHtml(

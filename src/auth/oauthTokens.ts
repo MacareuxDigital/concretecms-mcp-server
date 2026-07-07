@@ -5,10 +5,12 @@ import { RefreshTokenGrantProvider } from './RefreshTokenGrantProvider.js'
 
 export async function exchangeAuthorizationCode(
   callbackUrl: URL,
-  codeVerifier: string
+  codeVerifier: string,
+  expectedState?: string | null
 ): Promise<client.TokenEndpointResponse> {
   return client.authorizationCodeGrant(config, callbackUrl, {
     pkceCodeVerifier: codeVerifier,
+    ...(expectedState ? { expectedState } : {}),
   })
 }
 
