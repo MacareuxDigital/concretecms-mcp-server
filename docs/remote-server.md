@@ -1,6 +1,6 @@
 # Remote MCP Server Guide
 
-Use remote mode when an AI agent in the Concrete CMS dashboard (or another remote client) needs to connect over HTTP instead of spawning a local stdio process.
+Use remote mode when a remote MCP client needs to connect over HTTP instead of spawning a local stdio process. This is useful for hosted AI agents, web dashboards, or any client that cannot run the server as a local process.
 
 The server exposes a [Streamable HTTP](https://modelcontextprotocol.io/specification/2025-03-26/basic/transports) MCP endpoint and persistent OAuth routes.
 
@@ -9,7 +9,7 @@ The server exposes a [Streamable HTTP](https://modelcontextprotocol.io/specifica
 | Variable | Required | Default | Description |
 |----------|----------|---------|-------------|
 | `TRANSPORT_TYPE` | No | `stdio` | Set to `http` for remote mode |
-| `PUBLIC_BASE_URL` | Yes (http mode) | — | Public URL of this server, e.g. `https://mcp.your-concrete.example` |
+| `PUBLIC_BASE_URL` | Yes (http mode) | — | Public URL of this server, e.g. `https://mcp.example.com` |
 | `PATH_PREFIX` | No | _(empty)_ | Path prefix for all routes, e.g. `/ccm-mcp` |
 | `HTTP_HOST` | No | `0.0.0.0` | Bind address |
 | `HTTP_PORT` | No | `3000` | Listen port |
@@ -27,56 +27,71 @@ All `CONCRETE_*` variables from the [main README](../README.md) are still requir
 Register this redirect URI in your Concrete CMS API integration:
 
 ```
-https://mcp.your-concrete.example/oauth/callback
+https://mcp.example.com/oauth/callback
 ```
 
 Use the same value as `${PUBLIC_BASE_URL}${OAUTH_CALLBACK_PATH}`.
 
-## Same domain (no subdomain)
+## Hosting options
 
-You can run the MCP server on the same domain as Concrete CMS by setting a path prefix. This avoids conflicts with CMS routes such as `/oauth/2.0/authorize`.
+### Dedicated subdomain (default)
+
+Run the MCP server on its own hostname, for example `mcp.example.com`, pointing at your Concrete CMS site `cms.example.com`. Leave `PATH_PREFIX` unset.
+
+- MCP endpoint: `https://mcp.example.com/mcp`
+- OAuth start: `https://mcp.example.com/oauth/start`
+- OAuth callback: `https://mcp.example.com/oauth/callback`
+
+### Same domain with a path prefix
+
+You can also run the MCP server on the same domain as Concrete CMS by setting a path prefix. This avoids conflicts with CMS routes such as `/oauth/2.0/authorize`.
 
 ```bash
 TRANSPORT_TYPE=http
-PUBLIC_BASE_URL=https://your-concrete.example
+PUBLIC_BASE_URL=https://cms.example.com
 PATH_PREFIX=/ccm-mcp
-CONCRETE_CANONICAL_URL=https://your-concrete.example
+CONCRETE_CANONICAL_URL=https://cms.example.com
 ```
 
 With `PATH_PREFIX=/ccm-mcp`, the routes become:
 
-- MCP endpoint: `https://your-concrete.example/ccm-mcp/mcp`
-- OAuth start: `https://your-concrete.example/ccm-mcp/oauth/start`
-- OAuth callback: `https://your-concrete.example/ccm-mcp/oauth/callback`
+- MCP endpoint: `https://cms.example.com/ccm-mcp/mcp`
+- OAuth start: `https://cms.example.com/ccm-mcp/oauth/start`
+- OAuth callback: `https://cms.example.com/ccm-mcp/oauth/callback`
 
 Register the callback URL in your Concrete CMS API integration:
 
 ```
-https://your-concrete.example/ccm-mcp/oauth/callback
+https://cms.example.com/ccm-mcp/oauth/callback
 ```
 
 Individual path env vars (`MCP_ENDPOINT_PATH`, `OAUTH_START_PATH`, etc.) can override the defaults if needed.
 
-## Deploy on Linux with systemd (recommended)
+When sharing a domain with Concrete CMS, do not proxy the entire `/oauth/` prefix to the MCP server, because CMS uses `/oauth/2.0/*` for its own OAuth endpoints.
 
-For production on a Linux server (e.g. Amazon Linux, Ubuntu), running the MCP server as a **systemd service** is the simplest approach. The server listens on port 3000 locally; nginx handles HTTPS in front.
+## Deploy on Linux with systemd
+
+For production, running the MCP server as a **systemd service** is a simple and reliable approach. The server listens on port 3000 locally; place a reverse proxy in front for public access.
 
 ### 1. Install Node.js 20+
 
-On Amazon Linux 2023:
+Install Node.js 20 or later using your platform's recommended method. See the [Node.js download page](https://nodejs.org/en/download) for official packages and instructions.
+
+Verify the installation:
 
 ```bash
-curl -fsSL https://rpm.nodesource.com/setup_22.x | sudo bash -
-sudo dnf install -y nodejs
 node -v
+npm -v
 ```
 
 ### 2. Clone and build
 
+Choose an installation directory on your server, for example `/opt/concretecms-mcp`:
+
 ```bash
-sudo mkdir -p /var/www/vhosts/mcp.your-concrete.example
-sudo chown $USER /var/www/vhosts/mcp.your-concrete.example
-cd /var/www/vhosts/mcp.your-concrete.example
+sudo mkdir -p /opt/concretecms-mcp
+sudo chown $USER /opt/concretecms-mcp
+cd /opt/concretecms-mcp
 git clone https://github.com/MacareuxDigital/concretecms-mcp-server.git .
 npm ci && npm run build
 ```
@@ -85,14 +100,13 @@ npm ci && npm run build
 
 ```bash
 cp .env.example .env
-vi .env
 ```
 
-Example for a dedicated subdomain:
+Edit `.env` for your site. Example for a dedicated subdomain:
 
 ```bash
-PUBLIC_BASE_URL=https://mcp.your-concrete.example
-CONCRETE_CANONICAL_URL=https://your-concrete.example
+PUBLIC_BASE_URL=https://mcp.example.com
+CONCRETE_CANONICAL_URL=https://cms.example.com
 CONCRETE_API_CLIENT_ID=YOUR_API_CLIENT_ID
 CONCRETE_API_CLIENT_SECRET=YOUR_API_CLIENT_SECRET
 CONCRETE_API_SCOPE="account:read system:info:read"
@@ -101,8 +115,7 @@ HTTP_PORT=3000
 
 Notes:
 
-- Use a **single-level subdomain** (e.g. `mcp.example.c5j.me`) if your TLS certificate is a wildcard for `*.c5j.me`. Nested subdomains like `mcp.site.example.com` are not covered by `*.example.com`.
-- Quote values that contain spaces or `#` (systemd treats `#` as a comment in env files).
+- Quote values that contain spaces or `#` when using a systemd `EnvironmentFile`.
 - Omit `PATH_PREFIX` when using a dedicated subdomain.
 
 ### 4. Create a systemd service
@@ -120,13 +133,13 @@ After=network.target
 
 [Service]
 Type=simple
-User=www-user
-WorkingDirectory=/var/www/vhosts/mcp.your-concrete.example
-EnvironmentFile=/var/www/vhosts/mcp.your-concrete.example/.env
+User=mcp
+WorkingDirectory=/opt/concretecms-mcp
+EnvironmentFile=/opt/concretecms-mcp/.env
 Environment=TRANSPORT_TYPE=http
 Environment=HTTP_HOST=0.0.0.0
 Environment=HTTP_PORT=3000
-Environment=TOKEN_FILE=/var/www/vhosts/mcp.your-concrete.example/.tokens.json
+Environment=TOKEN_FILE=/opt/concretecms-mcp/.tokens.json
 ExecStart=/usr/bin/node dist/index.js
 Restart=on-failure
 RestartSec=5
@@ -135,7 +148,7 @@ RestartSec=5
 WantedBy=multi-user.target
 ```
 
-Replace `www-user` and paths with your deployment user and directory. Confirm the Node.js path with `which node`.
+Replace `User`, paths, and `ExecStart` with values that match your server. Confirm the Node.js path with `which node`.
 
 Enable and start:
 
@@ -149,80 +162,84 @@ sudo systemctl status concretecms-mcp
 Useful commands:
 
 ```bash
-sudo systemctl restart concretecms-mcp          # after git pull && npm run build
-sudo journalctl -u concretecms-mcp -f          # follow logs
-sudo systemctl reset-failed concretecms-mcp    # if the service hit restart limits
+sudo systemctl restart concretecms-mcp
+sudo journalctl -u concretecms-mcp -f
+sudo systemctl reset-failed concretecms-mcp
 ```
 
 After deploying code changes:
 
 ```bash
-cd /var/www/vhosts/mcp.your-concrete.example
+cd /opt/concretecms-mcp
 git pull
 npm run build
 sudo systemctl restart concretecms-mcp
 ```
 
-### 5. Reverse proxy (nginx)
+### 5. Reverse proxy
 
-Add a vhost for your MCP subdomain. Copy `ssl_certificate` paths from an existing site on the same server.
+Expose the service through your reverse proxy. The examples below use nginx, but the same routes can be configured on Apache, Caddy, or another proxy.
+
+#### Dedicated subdomain
+
+Add these `location` blocks to the vhost for your MCP hostname:
 
 ```nginx
-server {
-    listen 443 ssl;
-    server_name mcp.your-concrete.example;
-
-    ssl_certificate     /path/to/your/cert.crt;
-    ssl_certificate_key /path/to/your/cert.key;
-
-    location /mcp {
-        proxy_pass http://127.0.0.1:3000;
-        proxy_http_version 1.1;
-        proxy_set_header Host $host;
-        proxy_set_header X-Forwarded-Proto $scheme;
-        proxy_buffering off;
-    }
-
-    location = /oauth/start {
-        proxy_pass http://127.0.0.1:3000;
-        proxy_set_header Host $host;
-        proxy_set_header X-Forwarded-Proto $scheme;
-    }
-
-    location = /oauth/callback {
-        proxy_pass http://127.0.0.1:3000;
-        proxy_set_header Host $host;
-        proxy_set_header X-Forwarded-Proto $scheme;
-    }
-
-    location = /oauth/status {
-        proxy_pass http://127.0.0.1:3000;
-        proxy_set_header Host $host;
-    }
-
-    location = /health {
-        proxy_pass http://127.0.0.1:3000;
-        proxy_set_header Host $host;
-    }
+location /mcp {
+    proxy_pass http://127.0.0.1:3000;
+    proxy_http_version 1.1;
+    proxy_set_header Host $host;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    proxy_buffering off;
 }
 
-server {
-    listen 80;
-    server_name mcp.your-concrete.example;
-    return 301 https://$host$request_uri;
+location = /oauth/start {
+    proxy_pass http://127.0.0.1:3000;
+    proxy_set_header Host $host;
+    proxy_set_header X-Forwarded-Proto $scheme;
+}
+
+location = /oauth/callback {
+    proxy_pass http://127.0.0.1:3000;
+    proxy_set_header Host $host;
+    proxy_set_header X-Forwarded-Proto $scheme;
+}
+
+location = /oauth/status {
+    proxy_pass http://127.0.0.1:3000;
+    proxy_set_header Host $host;
+}
+
+location = /health {
+    proxy_pass http://127.0.0.1:3000;
+    proxy_set_header Host $host;
 }
 ```
 
-```bash
-sudo nginx -t
-sudo systemctl reload nginx
+#### Same domain with `PATH_PREFIX=/ccm-mcp`
+
+```nginx
+location /ccm-mcp/mcp {
+    proxy_pass http://127.0.0.1:3000;
+    proxy_http_version 1.1;
+    proxy_set_header Host $host;
+    proxy_buffering off;
+}
+
+location /ccm-mcp/oauth/ {
+    proxy_pass http://127.0.0.1:3000;
+}
+
+location /ccm-mcp/health {
+    proxy_pass http://127.0.0.1:3000;
+}
 ```
 
-See [Reverse proxy examples](#reverse-proxy-examples) below for path-prefix setups.
+Reload your proxy after changing the configuration.
 
 ### 6. Authorize
 
-1. Open `https://mcp.your-concrete.example/oauth/start` in a browser.
+1. Open your OAuth start URL in a browser, for example `https://mcp.example.com/oauth/start`.
 2. Sign in to Concrete CMS and approve the requested scopes.
 3. Check status at `GET /oauth/status`:
 
@@ -235,13 +252,13 @@ See [Reverse proxy examples](#reverse-proxy-examples) below for path-prefix setu
 Remote clients connect to the Streamable HTTP endpoint:
 
 ```
-POST https://mcp.your-concrete.example/mcp
+POST https://mcp.example.com/mcp
 ```
 
 Example initialize request:
 
 ```bash
-curl -X POST https://mcp.your-concrete.example/mcp \
+curl -X POST https://mcp.example.com/mcp \
   -H "Content-Type: application/json" \
   -H "Accept: application/json, text/event-stream" \
   -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-03-26","capabilities":{},"clientInfo":{"name":"test","version":"1.0.0"}}}'
@@ -258,53 +275,3 @@ docker compose up -d --build
 ```
 
 `TRANSPORT_TYPE=http` is set in `docker-compose.yml`. Tokens are persisted in the `mcp-tokens` Docker volume.
-
-## Reverse proxy examples
-
-When using `PATH_PREFIX=/ccm-mcp`:
-
-```nginx
-location /ccm-mcp/mcp {
-  proxy_pass http://127.0.0.1:3000;
-  proxy_http_version 1.1;
-  proxy_set_header Host $host;
-  proxy_buffering off;
-}
-
-location /ccm-mcp/oauth/ {
-  proxy_pass http://127.0.0.1:3000;
-}
-
-location /ccm-mcp/health {
-  proxy_pass http://127.0.0.1:3000;
-}
-```
-
-Without a path prefix:
-
-```nginx
-location /mcp {
-  proxy_pass http://127.0.0.1:3000;
-  proxy_http_version 1.1;
-  proxy_set_header Host $host;
-  proxy_buffering off;
-}
-
-location = /oauth/start {
-  proxy_pass http://127.0.0.1:3000;
-}
-
-location = /oauth/callback {
-  proxy_pass http://127.0.0.1:3000;
-}
-
-location = /oauth/status {
-  proxy_pass http://127.0.0.1:3000;
-}
-
-location = /health {
-  proxy_pass http://127.0.0.1:3000;
-}
-```
-
-Do not proxy the entire `/oauth/` prefix to the MCP server when sharing a domain with Concrete CMS, because CMS uses `/oauth/2.0/*` for its own OAuth endpoints.
