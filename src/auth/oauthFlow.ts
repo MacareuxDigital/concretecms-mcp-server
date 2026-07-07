@@ -2,14 +2,14 @@ import * as client from 'openid-client'
 import { createServer } from 'node:http'
 import { exec } from 'node:child_process'
 import { config } from './oidc.js'
-import { scope } from '../env.js'
-import { saveTokens } from '../tokenStore.js'
+import { httpPort, scope } from '../env.js'
 import { RefreshTokenGrantProvider } from './RefreshTokenGrantProvider.js'
+import { applyTokensToProvider, exchangeAuthorizationCode } from './oauthTokens.js'
 
 export async function performOAuthFlow(authProvider: RefreshTokenGrantProvider): Promise<void> {
-  const redirect_uri = 'http://localhost:3000/callback'
-  const code_verifier: string = client.randomPKCECodeVerifier()
-  const code_challenge: string = await client.calculatePKCECodeChallenge(code_verifier)
+  const redirect_uri = `http://localhost:${httpPort}/callback`
+  const code_verifier = client.randomPKCECodeVerifier()
+  const code_challenge = await client.calculatePKCECodeChallenge(code_verifier)
 
   const parameters: Record<string, string> = {
     redirect_uri,
@@ -18,15 +18,14 @@ export async function performOAuthFlow(authProvider: RefreshTokenGrantProvider):
     code_challenge_method: 'S256',
   }
 
-  const redirectTo: URL = client.buildAuthorizationUrl(config, parameters)
+  const redirectTo = client.buildAuthorizationUrl(config, parameters)
 
   return new Promise<void>((resolve, reject) => {
-    const PORT = 3000
-    const TIMEOUT_MS = 10 * 60 * 1000 // 10 minutes
+    const TIMEOUT_MS = 10 * 60 * 1000
     let timeoutId: NodeJS.Timeout
 
     const httpServer = createServer(async (req, res) => {
-      const url = new URL(req.url!, `http://localhost:${PORT}`)
+      const url = new URL(req.url!, `http://localhost:${httpPort}`)
 
       if (url.pathname === '/') {
         res.writeHead(200, { 'Content-Type': 'text/html' })
@@ -47,30 +46,10 @@ export async function performOAuthFlow(authProvider: RefreshTokenGrantProvider):
         `)
       } else if (url.pathname === '/callback') {
         try {
-          const getCurrentUrl = () => new URL(req.url!, `http://localhost:${PORT}`)
+          const getCurrentUrl = () => new URL(req.url!, `http://localhost:${httpPort}`)
           console.error('[concretecms-mcp] Received callback with code:', url.searchParams.get('code'))
-          const tokens: client.TokenEndpointResponse = await client.authorizationCodeGrant(
-            config,
-            getCurrentUrl(),
-            {
-              pkceCodeVerifier: code_verifier,
-            }
-          )
-
-          console.error('[concretecms-mcp] Token Endpoint Response', tokens)
-
-          authProvider.accessToken = tokens.access_token
-          authProvider.refreshToken = tokens.refresh_token
-          const expiresAt = Date.now() + tokens.expires_in! * 1000
-          authProvider.expiresAt = expiresAt
-          authProvider.parameters = parameters
-
-          saveTokens({
-            access_token: tokens.access_token,
-            refresh_token: tokens.refresh_token!,
-            expires_at: expiresAt,
-            parameters,
-          })
+          const tokens = await exchangeAuthorizationCode(getCurrentUrl(), code_verifier)
+          applyTokensToProvider(authProvider, tokens, parameters)
 
           res.writeHead(200, { 'Content-Type': 'text/html' })
           res.end(`
@@ -118,20 +97,20 @@ export async function performOAuthFlow(authProvider: RefreshTokenGrantProvider):
 
     httpServer.on('error', (error: NodeJS.ErrnoException) => {
       if (error.code === 'EADDRINUSE') {
-        console.error(`[concretecms-mcp] Port ${PORT} is already in use.`)
-        console.error(`[concretecms-mcp] Please close the application using this port or run:`)
-        console.error(`[concretecms-mcp]   lsof -ti:${PORT} | xargs kill -9`)
-        reject(new Error(`Port ${PORT} is already in use. Please free the port and try again.`))
+        console.error(`[concretecms-mcp] Port ${httpPort} is already in use.`)
+        console.error('[concretecms-mcp] Please close the application using this port or run:')
+        console.error(`[concretecms-mcp]   lsof -ti:${httpPort} | xargs kill -9`)
+        reject(new Error(`Port ${httpPort} is already in use. Please free the port and try again.`))
       } else {
         console.error('[concretecms-mcp] Server error:', error)
         reject(error)
       }
     })
 
-    httpServer.listen(PORT, () => {
-      console.error(`[concretecms-mcp] Local server started on http://localhost:${PORT}`)
-      console.error(`[concretecms-mcp] Server will automatically stop after 10 minutes if not used`)
-      console.error(`[concretecms-mcp] Opening browser...`)
+    httpServer.listen(httpPort, '127.0.0.1', () => {
+      console.error(`[concretecms-mcp] Local server started on http://localhost:${httpPort}`)
+      console.error('[concretecms-mcp] Server will automatically stop after 10 minutes if not used')
+      console.error('[concretecms-mcp] Opening browser...')
 
       timeoutId = setTimeout(() => {
         console.error('[concretecms-mcp] OAuth server timed out after 10 minutes')
@@ -143,17 +122,17 @@ export async function performOAuthFlow(authProvider: RefreshTokenGrantProvider):
       let command: string
 
       if (platform === 'darwin') {
-        command = `open "http://localhost:${PORT}"`
+        command = `open "http://localhost:${httpPort}"`
       } else if (platform === 'win32') {
-        command = `start "" "http://localhost:${PORT}"`
+        command = `start "" "http://localhost:${httpPort}"`
       } else {
-        command = `xdg-open "http://localhost:${PORT}"`
+        command = `xdg-open "http://localhost:${httpPort}"`
       }
 
       exec(command, (error) => {
         if (error) {
           console.error('[concretecms-mcp] Failed to open browser automatically.')
-          console.error(`[concretecms-mcp] Please open this URL manually: http://localhost:${PORT}`)
+          console.error(`[concretecms-mcp] Please open this URL manually: http://localhost:${httpPort}`)
         }
       })
     })

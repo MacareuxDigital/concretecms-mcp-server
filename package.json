@@ -6,6 +6,7 @@
   "bin": "dist/index.js",
   "scripts": {
     "build": "tsc",
+    "start": "node dist/index.js",
     "watch": "tsc --watch",
     "typecheck": "tsc --noEmit",
     "prepublishOnly": "npm run build"

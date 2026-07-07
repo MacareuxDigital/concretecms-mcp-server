@@ -100,4 +100,12 @@ export class RefreshTokenGrantProvider {
     }
     return false
   }
+
+  isAuthenticated(): boolean {
+    return !!(this._accessToken && this._refreshToken)
+  }
+
+  getExpiresAt(): number | undefined {
+    return this._expiresAt
+  }
 }
