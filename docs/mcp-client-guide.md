@@ -378,8 +378,9 @@ packages/your_ai_agent/
 ### OAuth in the dashboard
 
 1. On page load, call your controller → `/oauth/status`
-2. If not authenticated, show "Connect your account" linking to your controller → `/oauth/start` (which redirects to the MCP server's `Location` URL)
-3. After callback, poll status and enable the chat UI
+2. If not authenticated, show "Connect your account" linking to your controller → `/oauth/start`
+3. Your controller calls MCP `GET /oauth/start?user_id=N` server-side with `Authorization: Bearer <MCP_API_KEY>`, then redirects the browser to the MCP response **`Location` URL unchanged** (see [Proxied OAuth](remote-server.md#proxied-oauth-backend-clients) in the remote server guide)
+4. After callback, poll status and enable the chat UI
 
 ## AI agent loop
 
@@ -415,6 +416,7 @@ If the server uses `MCP_API_KEYS` with a user-bound key (`{"my-key": 42}`), the 
 | HTTP 400 | Missing `X-Concrete-User-Id` | Send CMS user ID header |
 | HTTP 409 | OAuth already in progress | Show wait message; do not start another flow |
 | `authenticated: false` | User has not OAuth'd | Start OAuth flow |
+| OAuth callback 400 | Stale MCP `dist/`, modified authorize URL, or MCP restarted mid-flow | Rebuild MCP server; forward `/oauth/start` `Location` unchanged — see [Remote MCP Server Guide](remote-server.md#proxied-oauth-backend-clients) |
 | Tool error / CMS 401 | Token expired or revoked | Re-authorize via `/oauth/start` |
 | HTTP 404 from proxy | Missing reverse proxy route | See [Remote MCP Server Guide](remote-server.md) |
 
@@ -422,7 +424,7 @@ If the server uses `MCP_API_KEYS` with a user-bound key (`{"my-key": 42}`), the 
 
 - [ ] `GET /health` returns `200`
 - [ ] `GET /oauth/status` returns `authenticated: false` before OAuth
-- [ ] `GET /oauth/start` returns `302` with CMS authorize URL (use GET, not HEAD)
+- [ ] `GET /oauth/start` returns `302` with CMS authorize URL containing `state=` (use GET, not HEAD)
 - [ ] After OAuth, status returns `authenticated: true`
 - [ ] `POST /mcp` `initialize` succeeds with auth headers
 - [ ] `tools/list` returns CMS tools
