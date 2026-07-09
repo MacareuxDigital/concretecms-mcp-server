@@ -6,9 +6,11 @@
   "bin": "dist/index.js",
   "scripts": {
     "build": "tsc",
+    "prestart": "npm run build",
     "start": "node dist/index.js",
     "watch": "tsc --watch",
     "typecheck": "tsc --noEmit",
+    "verify:oauth": "npm run build && node scripts/verify-oauth-session.mjs",
     "verify:security": "npm run build && node scripts/verify-security.mjs",
     "cleanup:tokens": "npm run build && node scripts/cleanup-tokens.mjs",
     "prepublishOnly": "npm run build"
