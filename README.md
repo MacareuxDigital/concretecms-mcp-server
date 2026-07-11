@@ -95,6 +95,17 @@ For example:
 
 You can find a list of all available endpoints in [Concrete CMS REST API - Endpoints](https://documentation.concretecms.org/9-x/developers/rest-api/concrete-cms-rest-api-endpoints)
 
+### High-level page tools
+
+In addition to OpenAPI-generated tools, the server exposes helpers for common page workflows:
+
+- `get_page_content` — read a page as a document (`html`, `html_raw`, and plain `text`) via `includes=content`
+- `update_page_content` — create an editable page version, remap block IDs, then update specific blocks (PUT page + PUT area)
+
+Prefer these when reviewing or editing page copy. Use the raw OpenAPI tools (`getPageById`, `updateBlockInPageArea`, etc.) for lower-level control.
+
+Required OAuth scopes for the update helper: `pages:read`, `pages:update`, `pages:areas:update_blocks`.
+
 ## ToDos
 
 - Test with other MCP clients.

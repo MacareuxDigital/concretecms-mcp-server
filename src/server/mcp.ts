@@ -15,6 +15,7 @@ import {
   transportType,
 } from '../env.js'
 import { OPENAPI_SPEC_FILE } from '../paths.js'
+import { createPageTools } from '../tools/pageTools.js'
 
 export interface McpServerOptions {
   transport?: 'stdio' | 'http'
@@ -41,6 +42,7 @@ export async function startMcpServer(
     toolsMode: 'all' as const,
     disableAbbreviation: true,
     authProvider,
+    extraTools: createPageTools(authProvider),
   }
 
   const openApiServer = new OpenAPIServer(openApiServerConfig)

@@ -18,6 +18,7 @@ When running in remote mode (`TRANSPORT_TYPE=http`), the server exposes:
 - **Streamable HTTP** MCP endpoint at `/mcp` ([MCP spec](https://modelcontextprotocol.io/specification/2025-03-26/basic/transports))
 - **Per-user OAuth** admin routes (`/oauth/start`, `/oauth/status`, `/oauth/revoke`)
 - **Tools** derived from the Concrete CMS OpenAPI spec (`openapi.yml`) — pages, files, users, system info, and more
+- **High-level page tools** — `get_page_content` (document HTML/text) and `update_page_content` (PUT page then PUT area with block-ID remapping)
 - **CMS API execution** using each user's OAuth token; permissions follow that user's CMS scopes
 
 Your application owns the conversation loop. The MCP server owns CMS token storage and tool execution.
@@ -255,7 +256,7 @@ Send as a separate request (no `id` field):
 }
 ```
 
-Tool names correspond to OpenAPI operations (e.g. `get-system-info`, `get-pages`, `get-account`). Use `tools/list` to discover the exact names and input schemas for your server's `openapi.yml`.
+Tool names correspond to OpenAPI operations (e.g. `get-system-info`, `get-pages`, `get-account`) plus high-level helpers (`get_page_content`, `update_page_content`). Prefer the high-level page tools when reading or editing page copy; use raw OpenAPI tools for lower-level control. Use `tools/list` to discover the exact names and input schemas for your server's `openapi.yml`.
 
 ## Backend agent service
 
