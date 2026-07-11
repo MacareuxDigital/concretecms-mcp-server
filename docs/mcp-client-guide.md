@@ -416,7 +416,7 @@ If the server uses `MCP_API_KEYS` with a user-bound key (`{"my-key": 42}`), the 
 | HTTP 400 | Missing `X-Concrete-User-Id` | Send CMS user ID header |
 | HTTP 409 | OAuth already in progress | Show wait message; do not start another flow |
 | `authenticated: false` | User has not OAuth'd | Start OAuth flow |
-| OAuth callback 400 | Stale MCP `dist/`, modified authorize URL, or MCP restarted mid-flow | Rebuild MCP server; forward `/oauth/start` `Location` unchanged — see [Remote MCP Server Guide](remote-server.md#proxied-oauth-backend-clients) |
+| OAuth callback 400 | Stale MCP `dist/`, modified authorize URL, MCP restarted mid-flow, or expired session | Rebuild MCP server; forward `/oauth/start` `Location` unchanged; retry within 10 minutes — see [Remote MCP Server Guide](remote-server.md#proxied-oauth-backend-clients) |
 | Tool error / CMS 401 | Token expired or revoked | Re-authorize via `/oauth/start` |
 | HTTP 404 from proxy | Missing reverse proxy route | See [Remote MCP Server Guide](remote-server.md) |
 
