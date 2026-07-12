@@ -18,6 +18,7 @@ When running in remote mode (`TRANSPORT_TYPE=http`), the server exposes:
 - **Streamable HTTP** MCP endpoint at `/mcp` ([MCP spec](https://modelcontextprotocol.io/specification/2025-03-26/basic/transports))
 - **Per-user OAuth** admin routes (`/oauth/start`, `/oauth/status`, `/oauth/revoke`)
 - **Tools** derived from the Concrete CMS OpenAPI spec (`openapi.yml`) — pages, files, users, system info, and more
+- **High-level page tools** — `get_page_content` (document HTML/text) and `update_page_content` (PUT page then PUT area with block-ID remapping)
 - **CMS API execution** using each user's OAuth token; permissions follow that user's CMS scopes
 
 Your application owns the conversation loop. The MCP server owns CMS token storage and tool execution.
@@ -255,7 +256,7 @@ Send as a separate request (no `id` field):
 }
 ```
 
-Tool names correspond to OpenAPI operations (e.g. `get-system-info`, `get-pages`, `get-account`). Use `tools/list` to discover the exact names and input schemas for your server's `openapi.yml`.
+Tool names correspond to OpenAPI operations (e.g. `get-system-info`, `get-pages`, `get-account`) plus high-level helpers (`get_page_content`, `update_page_content`). Prefer the high-level page tools when reading or editing page copy; use raw OpenAPI tools for lower-level control. Use `tools/list` to discover the exact names and input schemas for your server's `openapi.yml`.
 
 ## Backend agent service
 
@@ -416,7 +417,7 @@ If the server uses `MCP_API_KEYS` with a user-bound key (`{"my-key": 42}`), the 
 | HTTP 400 | Missing `X-Concrete-User-Id` | Send CMS user ID header |
 | HTTP 409 | OAuth already in progress | Show wait message; do not start another flow |
 | `authenticated: false` | User has not OAuth'd | Start OAuth flow |
-| OAuth callback 400 | Stale MCP `dist/`, modified authorize URL, or MCP restarted mid-flow | Rebuild MCP server; forward `/oauth/start` `Location` unchanged — see [Remote MCP Server Guide](remote-server.md#proxied-oauth-backend-clients) |
+| OAuth callback 400 | Stale MCP `dist/`, modified authorize URL, MCP restarted mid-flow, or expired session | Rebuild MCP server; forward `/oauth/start` `Location` unchanged; retry within 10 minutes — see [Remote MCP Server Guide](remote-server.md#proxied-oauth-backend-clients) |
 | Tool error / CMS 401 | Token expired or revoked | Re-authorize via `/oauth/start` |
 | HTTP 404 from proxy | Missing reverse proxy route | See [Remote MCP Server Guide](remote-server.md) |
 

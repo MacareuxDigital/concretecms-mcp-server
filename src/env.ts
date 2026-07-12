@@ -115,6 +115,17 @@ export const mcpApiKeys = parseMcpApiKeys()
 
 export const tokenEncryptionKey = process.env.TOKEN_ENCRYPTION_KEY ?? null
 
+export const oauthDebug = (() => {
+  const value = process.env.OAUTH_DEBUG
+  if (value === '1' || value === 'true') {
+    return true
+  }
+  if (value === '0' || value === 'false') {
+    return false
+  }
+  return false
+})()
+
 let stdioEncryptionWarningShown = false
 
 export function getTokenEncryptionKey(): string | null {

@@ -1,5 +1,5 @@
 import { MultiUserAuthProvider } from './auth/MultiUserAuthProvider.js'
-import { oauthStartPath, transportType, warnStdioEncryptionOnce } from './env.js'
+import { oauthStartPath, oauthDebug, transportType, warnStdioEncryptionOnce } from './env.js'
 import { startMcpServer } from './server/mcp.js'
 import { createSharedHttpServer } from './server/http.js'
 import { cleanupExpiredTokens, migrateLegacyTokens } from './tokenStore.js'
@@ -24,6 +24,9 @@ async function startHttpServer(authProvider: MultiUserAuthProvider): Promise<voi
   await startMcpServer(authProvider, { transport: 'http', httpServer })
 
   console.error(`[concretecms-mcp] Remote MCP server ready. Authorize users via ${oauthStartPath}`)
+  if (oauthDebug) {
+    console.error('[concretecms-mcp] OAUTH_DEBUG=1 — callback failures will include reason details in the browser')
+  }
 }
 
 export async function main(): Promise<void> {

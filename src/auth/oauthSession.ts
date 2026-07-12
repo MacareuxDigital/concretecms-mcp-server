@@ -57,18 +57,16 @@ export async function createOAuthSession(
   }
 }
 
-export function consumeOAuthSession(state: string | null): OAuthSession | null {
-  if (!state) {
-    return null
-  }
-
+export function getOAuthSession(state: string): OAuthSession | undefined {
   cleanupExpiredSessions()
+  return sessions.get(state)
+}
 
-  const session = sessions.get(state)
-  if (!session) {
-    return null
-  }
+export function listPendingOAuthSessions(): Array<{ stateKey: string; session: OAuthSession }> {
+  cleanupExpiredSessions()
+  return [...sessions.entries()].map(([stateKey, session]) => ({ stateKey, session }))
+}
 
-  sessions.delete(state)
-  return session
+export function removeOAuthSession(stateKey: string): boolean {
+  return sessions.delete(stateKey)
 }

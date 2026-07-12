@@ -172,6 +172,23 @@ curl -s -D - -o /dev/null -H "Authorization: Bearer $MCP_API_KEY" \
 
 You can also run `npm run verify:oauth` to confirm the shipped `dist/` uses state-based session binding.
 
+**OAuth debug mode** (recommended while troubleshooting callback failures):
+
+```bash
+OAUTH_DEBUG=1 npm run start
+```
+
+When enabled, the browser callback page shows a `Reason:` code and details. The MCP server always logs the same reason to stderr, for example:
+
+| Reason | Meaning |
+|--------|---------|
+| `no_pending_sessions` | MCP has no in-memory OAuth session (server restarted, flow expired, or `/oauth/start` never reached this process) |
+| `pkce_match_failed` | Callback arrived, but token exchange failed for every pending session — see per-session errors in logs |
+| `user_id_mismatch` | Token exchange succeeded, but the CMS account that approved OAuth is not the `user_id` from `/oauth/start` |
+| `resolve_cms_user_failed` | Token exchange succeeded, but `/ccm/api/1.0/account` could not be read with the new access token |
+| `oauth_provider_error` | CMS redirected with `error=` instead of `code=` |
+| `missing_authorization_code` | Callback reached MCP without a `code` query parameter |
+
 ### 6. Connect your AI agent
 
 Point your agent or MCP client at the local server:
@@ -201,9 +218,9 @@ Authorize the CMS user via `/oauth/start` before calling tools. Poll `/oauth/sta
 | Broken multiline command | Missing `\` at end of a line | Every continued line except the last must end with `\` |
 | OAuth redirect mismatch | `PUBLIC_BASE_URL` differs from registered URI | Register `http://127.0.0.1:3000/oauth/callback` in CMS and match `PUBLIC_BASE_URL` |
 | Port already in use | Another process on port 3000 | Change `HTTP_PORT` and update `PUBLIC_BASE_URL` accordingly |
-| OAuth callback **400** — Invalid or expired OAuth session | Stale `dist/` (authorize URL missing `state`) or MCP restarted mid-flow | Run `npm run build`, restart **one** MCP process, verify `/oauth/start` `Location` includes `state=` |
+| OAuth callback **400** — Authorization could not be completed | See MCP server logs for `OAuth callback failed: <reason>` | Restart with `OAUTH_DEBUG=1` to show the reason in the browser |
 | Authorize URL missing `state` | Running outdated `dist/` | `npm run build && npm run verify:oauth`, then restart |
-| Callback 400 with `state` present | Client modified MCP `Location` URL, or multiple MCP processes | Forward `Location` unchanged; `lsof -nP -iTCP:3000 -sTCP:LISTEN` |
+| Callback 400 with `state` present | Client modified MCP `Location` URL, multiple MCP processes, or expired session | Forward `Location` unchanged; `lsof -nP -iTCP:3000 -sTCP:LISTEN`; complete flow within 10 minutes |
 | `/oauth/start` 409 | Concurrent OAuth for same user | Wait or call `/oauth/revoke` |
 
 ## Concrete CMS OAuth setup
@@ -256,10 +273,12 @@ sequenceDiagram
 1. **Backend** calls `GET /oauth/start?user_id=N` with `Authorization: Bearer <MCP_API_KEY>`.
 2. MCP returns **`302`** with `Location:` pointing to the CMS authorize URL. The URL includes **`state=`**, **`code_challenge=`**, `client_id`, and `redirect_uri`.
 3. Backend redirects the **browser** to that `Location` URL **unchanged** (do not rebuild or strip query parameters).
-4. User approves on Concrete CMS. CMS echoes the same `state` on callback.
-5. Browser hits `{PUBLIC_BASE_URL}/oauth/callback?code=...&state=...`. MCP looks up the in-memory session by `state` and exchanges the code.
+4. User approves on Concrete CMS. CMS redirects to `{PUBLIC_BASE_URL}/oauth/callback?code=...&state=...`.
+5. Browser hits the MCP callback. MCP resolves the pending PKCE session (by callback `state` when echoed, otherwise by trying each pending session until PKCE verification succeeds — Concrete CMS currently **replaces** `state` on callback rather than echoing the value from step 2) and exchanges the code.
 
-The browser does **not** need an MCP-host cookie. Session binding uses standard OAuth `state`, not `Set-Cookie`.
+The browser does **not** need an MCP-host cookie. Session binding uses PKCE plus an in-memory pending session, not `Set-Cookie`.
+
+> **Concrete CMS `state` behavior:** The authorize URL from `/oauth/start` includes MCP-generated `state`, but Concrete CMS may issue a **different** `state` on callback. The MCP server handles this by matching the authorization code to the correct pending session through PKCE verification. Concurrent OAuth flows remain safe because only the session whose `code_verifier` matches the issued code can complete token exchange.
 
 > **Important:** `npm run start` runs `dist/index.js`. After editing `src/`, run `npm run build` (or rely on the `prestart` hook) so `dist/` matches `src/`. A stale `dist/` build that omits `state` from authorize URLs will cause callback **400 Invalid or expired OAuth session** for proxied clients.
 

@@ -40,9 +40,12 @@ for (const [key, value] of Object.entries(baseEnv())) {
 
 console.log('OAuth session binding tests')
 
-const { createOAuthSession, consumeOAuthSession } = await import(
-  `file://${join(projectRoot, 'dist/auth/oauthSession.js')}?t=${Date.now()}`
-)
+const {
+  createOAuthSession,
+  getOAuthSession,
+  listPendingOAuthSessions,
+  removeOAuthSession,
+} = await import(`file://${join(projectRoot, 'dist/auth/oauthSession.js')}?t=${Date.now()}`)
 
 const { state, authorizationUrl } = await createOAuthSession(
   'http://127.0.0.1:3000/oauth/callback',
@@ -65,10 +68,29 @@ assert(
   'authorize URL includes PKCE code_challenge'
 )
 
-const session = consumeOAuthSession(state)
-assert(session?.codeVerifier !== undefined, 'consumeOAuthSession(state) returns PKCE session')
-assert(consumeOAuthSession(state) === null, 'session is single-use after consume')
-assert(consumeOAuthSession('wrong-state') === null, 'unknown state returns null')
+assert(getOAuthSession(state)?.codeVerifier !== undefined, 'getOAuthSession(state) returns PKCE session')
+assert(listPendingOAuthSessions().length === 1, 'one pending session is listed')
+
+const { state: state2 } = await createOAuthSession(
+  'http://127.0.0.1:3000/oauth/callback',
+  'account:read',
+  43,
+  '43'
+)
+
+assert(listPendingOAuthSessions().length === 2, 'multiple concurrent pending sessions are retained')
+assert(
+  getOAuthSession('cms-replaced-state-value') === undefined,
+  'unknown callback state does not consume pending sessions'
+)
+assert(listPendingOAuthSessions().length === 2, 'pending sessions remain after unknown state lookup')
+
+removeOAuthSession(state)
+assert(getOAuthSession(state) === undefined, 'removeOAuthSession deletes only the targeted session')
+assert(listPendingOAuthSessions().length === 1, 'other pending sessions remain after targeted removal')
+
+removeOAuthSession(state2)
+assert(listPendingOAuthSessions().length === 0, 'all pending sessions can be removed individually')
 
 console.log('Shipped dist guardrails')
 
@@ -90,6 +112,14 @@ assert(
 assert(
   oauthHandlersSource.includes("searchParams.get('state')"),
   'dist/oauthHandlers.js reads state from callback query'
+)
+assert(
+  oauthHandlersSource.includes('logOAuthCallbackFailure'),
+  'dist/oauthHandlers.js logs structured OAuth callback failure reasons'
+)
+assert(
+  !oauthHandlersSource.includes('pending-fallback'),
+  'dist/oauthHandlers.js does not use newest-session fallback'
 )
 assert(
   !oauthHandlersSource.includes('Set-Cookie'),

@@ -13,7 +13,15 @@ import {
 import { clearTokens } from '../tokenStore.js'
 import { MultiUserAuthProvider } from './MultiUserAuthProvider.js'
 import { acquireOAuthStartLock, releaseOAuthStartLock } from './authCoordinator.js'
-import { consumeOAuthSession, createOAuthSession } from './oauthSession.js'
+import type { OAuthSession } from './oauthSession.js'
+import { getOAuthSession, listPendingOAuthSessions, removeOAuthSession, createOAuthSession } from './oauthSession.js'
+import {
+  describeOAuthError,
+  formatOAuthFailureHtmlBody,
+  logOAuthCallbackEvent,
+  logOAuthCallbackFailure,
+  type OAuthCallbackFailure,
+} from './oauthDebug.js'
 import { exchangeAuthorizationCode, saveTokensForUser } from './oauthTokens.js'
 import { parseOAuthUserId, validateOAuthApiKey } from '../server/authMiddleware.js'
 import { sendJson, blockFurtherResponseWrites } from '../server/httpResponse.js'
@@ -35,6 +43,32 @@ function isOriginAllowed(req: IncomingMessage): boolean {
     return originUrl.origin === publicUrl.origin
   } catch {
     return false
+  }
+}
+
+function sendOAuthFailure(res: ServerResponse, failure: OAuthCallbackFailure): void {
+  logOAuthCallbackFailure(failure)
+  sendHtml(res, 400, 'Authorization Failed', formatOAuthFailureHtmlBody(failure))
+}
+
+function classifyPostExchangeError(error: unknown): OAuthCallbackFailure {
+  const detail = describeOAuthError(error)
+  const message = detail.includes('does not match intended user')
+    ? 'The CMS account that approved OAuth does not match the requested user.'
+    : detail.includes('Failed to resolve CMS user')
+      ? 'OAuth succeeded, but the MCP server could not resolve the CMS user from the access token.'
+      : 'OAuth succeeded, but the MCP server could not save the tokens.'
+
+  const reason = detail.includes('does not match intended user')
+    ? 'user_id_mismatch'
+    : detail.includes('Failed to resolve CMS user')
+      ? 'resolve_cms_user_failed'
+      : 'token_persistence_failed'
+
+  return {
+    reason,
+    message,
+    detail,
   }
 }
 
@@ -163,25 +197,133 @@ async function handleOAuthCallback(
 
   const callbackUrl = new URL(req.url!, publicBaseUrl)
   const state = callbackUrl.searchParams.get('state')
-  const session = consumeOAuthSession(state)
+  const code = callbackUrl.searchParams.get('code')
+  const oauthError = callbackUrl.searchParams.get('error')
+  const oauthErrorDescription = callbackUrl.searchParams.get('error_description')
+  const pendingSessions = listPendingOAuthSessions()
 
-  if (!session) {
-    sendHtml(
-      res,
-      400,
-      'Authorization Failed',
-      '<h1>Authorization Failed</h1><p>Invalid or expired OAuth session. Please try again.</p>'
-    )
+  logOAuthCallbackEvent('OAuth callback received', {
+    hasCode: Boolean(code),
+    hasState: Boolean(state),
+    pendingSessionCount: pendingSessions.length,
+    pendingUserIds: pendingSessions.map(({ session }) => session.intendedUserId ?? session.lockUserId),
+    oauthError: oauthError ?? undefined,
+  })
+
+  if (oauthError) {
+    sendOAuthFailure(res, {
+      reason: 'oauth_provider_error',
+      message: 'Concrete CMS rejected the OAuth request before the MCP server could finish authorization.',
+      detail: oauthErrorDescription ?? oauthError,
+      context: {
+        error: oauthError,
+        error_description: oauthErrorDescription ?? undefined,
+      },
+    })
     return
   }
 
+  if (!code) {
+    sendOAuthFailure(res, {
+      reason: 'missing_authorization_code',
+      message: 'The OAuth callback did not include an authorization code.',
+      context: {
+        hasState: Boolean(state),
+        pendingSessionCount: pendingSessions.length,
+      },
+    })
+    return
+  }
+
+  const candidates: Array<{ stateKey: string; session: OAuthSession }> = []
+  if (state) {
+    const session = getOAuthSession(state)
+    if (session) {
+      candidates.push({ stateKey: state, session })
+      logOAuthCallbackEvent('OAuth callback matched pending session by state')
+    }
+  }
+
+  if (candidates.length === 0) {
+    candidates.push(...pendingSessions)
+    if (candidates.length > 0) {
+      logOAuthCallbackEvent('OAuth callback will probe pending sessions via PKCE', {
+        pendingSessionCount: candidates.length,
+        callbackStatePrefix: state ? `${state.slice(0, 8)}...` : undefined,
+      })
+    }
+  }
+
+  if (candidates.length === 0) {
+    sendOAuthFailure(res, {
+      reason: 'no_pending_sessions',
+      message: 'No pending OAuth session was found for this callback.',
+      detail:
+        'Start OAuth again from /oauth/start and complete it within 10 minutes without restarting the MCP server.',
+      context: {
+        hasState: Boolean(state),
+        callbackStatePrefix: state ? `${state.slice(0, 8)}...` : undefined,
+      },
+    })
+    return
+  }
+
+  let matched: (typeof candidates)[number] | null = null
+  let tokens: Awaited<ReturnType<typeof exchangeAuthorizationCode>> | null = null
+  const exchangeFailures: Array<{
+    stateKeyPrefix: string
+    intendedUserId?: number
+    lockUserId: string
+    error: string
+  }> = []
+
+  for (const candidate of candidates) {
+    try {
+      tokens = await exchangeAuthorizationCode(callbackUrl, candidate.session.codeVerifier, state)
+      matched = candidate
+      break
+    } catch (error) {
+      exchangeFailures.push({
+        stateKeyPrefix: `${candidate.stateKey.slice(0, 8)}...`,
+        intendedUserId: candidate.session.intendedUserId,
+        lockUserId: candidate.session.lockUserId,
+        error: describeOAuthError(error),
+      })
+    }
+  }
+
+  if (!matched || !tokens) {
+    sendOAuthFailure(res, {
+      reason: 'pkce_match_failed',
+      message: 'The authorization code could not be matched to a pending OAuth session.',
+      detail: exchangeFailures.map((failure) => JSON.stringify(failure)).join('\n'),
+      context: {
+        candidateCount: candidates.length,
+        exchangeFailures,
+      },
+    })
+    return
+  }
+
+  if (state && matched.stateKey !== state) {
+    logOAuthCallbackEvent('OAuth session resolved via PKCE match (CMS replaced callback state)', {
+      matchedStateKeyPrefix: `${matched.stateKey.slice(0, 8)}...`,
+      callbackStatePrefix: `${state.slice(0, 8)}...`,
+      intendedUserId: matched.session.intendedUserId,
+    })
+  }
+
+  removeOAuthSession(matched.stateKey)
+
   try {
-    console.error('[concretecms-mcp] Processing OAuth callback')
-    const tokens = await exchangeAuthorizationCode(callbackUrl, session.codeVerifier, state)
+    logOAuthCallbackEvent('OAuth code exchange succeeded; saving tokens', {
+      intendedUserId: matched.session.intendedUserId,
+      lockUserId: matched.session.lockUserId,
+    })
     const { userId, stored } = await saveTokensForUser(
       tokens,
-      session.parameters,
-      session.intendedUserId
+      matched.session.parameters,
+      matched.session.intendedUserId
     )
 
     authProvider.getSessionForUser(userId).applyTokens(stored)
@@ -193,15 +335,9 @@ async function handleOAuthCallback(
       `<h1>Authorization Successful!</h1><p>User ${userId} is now authorized. You can close this window and return to the application.</p>`
     )
   } catch (error) {
-    console.error(`[concretecms-mcp] Token exchange failed: ${redactError(error)}`)
-    sendHtml(
-      res,
-      400,
-      'Authorization Failed',
-      '<h1>Authorization Failed</h1><p>Authorization could not be completed. Please try again.</p>'
-    )
+    sendOAuthFailure(res, classifyPostExchangeError(error))
   } finally {
-    releaseOAuthStartLock(session.lockUserId)
+    releaseOAuthStartLock(matched.session.lockUserId)
   }
 }
 
