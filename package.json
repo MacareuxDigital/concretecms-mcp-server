@@ -17,7 +17,7 @@
     "prepublishOnly": "npm run build"
   },
   "engines": {
-    "node": ">=20"
+    "node": ">=22"
   },
   "author": "",
   "license": "MIT",
