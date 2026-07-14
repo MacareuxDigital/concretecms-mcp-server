@@ -27,3 +27,5 @@ jobs:
         run: npm run verify:oauth
       - name: Verify security
         run: npm run verify:security
+      - name: Check dependency vulnerabilities
+        run: npm audit --audit-level=moderate --dry-run
