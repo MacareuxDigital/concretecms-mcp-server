@@ -22,7 +22,9 @@ Remote clients authenticate with `Authorization: Bearer <MCP_API_KEY>` and ident
 
 See the **[MCP Client Developer Guide](mcp-client-guide.md)** for HTTP API details, OAuth flow, and implementation patterns.
 
-For local stdio (Claude Desktop) or personal `mcp-remote` bridge setup, see the [main README](../README.md).
+For local stdio (Claude Desktop spawning the process), see the [main README](../README.md).
+
+For ChatGPT, Claude Desktop via `mcp-remote`, or other local clients connecting to this remote server, see **[Connect Local MCP Clients to a Remote Server](local-clients.md)**.
 
 See the [Security Guide](security.md) for the full trust model.
 
@@ -537,7 +539,7 @@ X-Concrete-User-Id: <cms_user_id>
 
 Poll `/oauth/status?user_id=<id>` before enabling AI for a user. Trigger `GET /oauth/start?user_id=<id>` when not authenticated.
 
-For Claude Desktop or `mcp-remote` personal bridge setup, see the [main README](../README.md).
+For ChatGPT, Claude Desktop via `mcp-remote`, or other local desktop clients, see **[Connect Local MCP Clients to a Remote Server](local-clients.md)**.
 
 ## Docker deployment (alternative)
 

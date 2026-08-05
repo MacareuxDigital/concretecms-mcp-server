@@ -2,7 +2,7 @@
 
 This guide is for **developers** building an MCP client or AI agent that connects to a remote Concrete CMS MCP server over HTTP.
 
-It covers the HTTP API, per-user OAuth, MCP protocol usage, implementation patterns, and agent loops. It does not cover MCP server deployment (see the [Remote MCP Server Guide](remote-server.md)) or end-user desktop app configuration (see the [main README](../README.md)).
+It covers the HTTP API, per-user OAuth, MCP protocol usage, implementation patterns, and agent loops. It does not cover MCP server deployment (see the [Remote MCP Server Guide](remote-server.md)) or end-user desktop clients such as ChatGPT / Claude Desktop → remote (see [Connect Local MCP Clients to a Remote Server](local-clients.md)). For local stdio Claude Desktop, see the [main README](../README.md).
 
 ## Who this is for
 

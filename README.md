@@ -65,11 +65,13 @@ To host the MCP server on a remote Linux server, see the **[Remote MCP Server Gu
 
 It covers systemd deployment, reverse proxy setup, OAuth configuration, and Docker as an alternative.
 
+To connect a **local desktop client** (ChatGPT Streamable HTTP, Claude Desktop via `mcp-remote`, or another remote MCP client) to that server, see **[Connect Local MCP Clients to a Remote Server](docs/local-clients.md)**.
+
 ### For developers: build an MCP client or AI agent
 
 If you are building a programmatic MCP client or AI agent (backend service, web app with chat UI, or Concrete CMS package) that connects to a remote MCP server over HTTP, see the **[MCP Client Developer Guide](docs/mcp-client-guide.md)**.
 
-It covers the HTTP API, per-user OAuth, agent loops, and implementation patterns. It does not cover Claude Desktop or Cursor configuration — use the local stdio section above for that.
+It covers the HTTP API, per-user OAuth, agent loops, and implementation patterns. For end-user desktop apps talking to a remote server, see [docs/local-clients.md](docs/local-clients.md). For local stdio Claude Desktop, use the section above.
 
 ### Use your own OpenAPI specification
 
